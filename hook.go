@@ -117,9 +117,6 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 	h.Log.Debug("Setting LD_PRELOAD...")
 	extra += fmt.Sprintf("\nexport LD_PRELOAD=${HOME}/%s", agentLibPath)
 
-	h.Log.Debug("Setting DT_HOST_ID...")
-	extra += fmt.Sprintf("\nexport DT_HOST_ID=%s_${CF_INSTANCE_INDEX}", h.appName())
-
 	if os.Getenv("DT_LOGSTREAM") == "" {
 		h.Log.Debug("Setting DT_LOGSTREAM to stdout...")
 		extra += "\nexport DT_LOGSTREAM=stdout"
