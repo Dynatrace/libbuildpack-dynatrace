@@ -84,7 +84,7 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 	dynatraceEnvName := "dynatrace-env.sh"
 	installDir := filepath.Join("dynatrace", "oneagent")
 	dynatraceEnvPath := filepath.Join(stager.DepDir(), "profile.d", dynatraceEnvName)
-	agentLibPath, err := h.agentPath(filepath.Join(stager.BuildDir(), installDir))
+	agentLibPath, err := h.findAgentPath(filepath.Join(stager.BuildDir(), installDir))
 	if err != nil {
 		h.Log.Error("Manifest handling failed!")
 		return err
@@ -117,6 +117,8 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 	h.Log.Debug("Setting LD_PRELOAD...")
 	extra += fmt.Sprintf("\nexport LD_PRELOAD=${HOME}/%s", agentLibPath)
 
+	// By default, OneAgent logs are printed to stderr. If the customer doesn't override this behavior through an
+	// environment variable, then we change the default output to stdout.
 	if os.Getenv("DT_LOGSTREAM") == "" {
 		h.Log.Debug("Setting DT_LOGSTREAM to stdout...")
 		extra += "\nexport DT_LOGSTREAM=stdout"
@@ -218,12 +220,14 @@ func (h *Hook) download(url, installerPath string) error {
 			h.Log.Debug("Download returned with status %s, error: %v", resp.Status, err)
 
 			if i == h.MaxDownloadRetries {
+				h.Log.Warning("Maximum number of retries attempted: %d", h.MaxDownloadRetries)
 				return fmt.Errorf("Download returned with status %s, error: %v", resp.Status, err)
 			}
 		} else {
 			h.Log.Debug("Download failed: %v", err)
 
 			if i == h.MaxDownloadRetries {
+				h.Log.Warning("Maximum number of retries attempted: %d", h.MaxDownloadRetries)
 				return err
 			}
 		}
@@ -256,7 +260,9 @@ func (h *Hook) getDownloadURL(c *Credentials) string {
 	return u.String()
 }
 
-func (h *Hook) agentPath(installDir string) (string, error) {
+// findAgentPath reads the manifest file included in the PaaS agent package, and looks
+// for the process agent file path.
+func (h *Hook) findAgentPath(installDir string) (string, error) {
 	type Binary struct {
 		Path       string `json:"path"`
 		BinaryType string `json:"binarytype,omitempty"`
