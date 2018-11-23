@@ -16,13 +16,14 @@ import (
 	"github.com/cloudfoundry/libbuildpack"
 )
 
-// Command is used to mock around libbuildpack.Command
+// Command is an interface around libbuildpack.Command. Represents an executor for external command calls. We have it
+// as an interface so that we can mock it and use in the unit tests.
 type Command interface {
 	Execute(string, io.Writer, io.Writer, string, ...string) error
 }
 
-// Credentials represent the user settings extracted from the environment.
-type Credentials struct {
+// credentials represent the user settings extracted from the environment.
+type credentials struct {
 	ServiceName   string
 	EnvironmentID string
 	APIToken      string
@@ -33,10 +34,14 @@ type Credentials struct {
 // Hook implements libbuildpack.Hook. It downloads and install the Dynatrace PaaS OneAgent.
 type Hook struct {
 	libbuildpack.DefaultHook
-	Log                 *libbuildpack.Logger
-	Command             Command
+	Log     *libbuildpack.Logger
+	Command Command
+
+	// IncludeTechnologies is used to indicate the technologies we want to download agents for.
 	IncludeTechnologies []string
-	MaxDownloadRetries  int
+
+	// MaxDownloadRetries is the maximum number of retries the hook will try to download the agent if they fail.
+	MaxDownloadRetries int
 }
 
 // AfterCompile downloads and installs the Dynatrace agent.
@@ -45,41 +50,49 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 
 	h.Log.Debug("Checking for enabled dynatrace service...")
 
-	credentials, found := h.getCredentials()
-	if !found {
+	// Get credentials...
+
+	creds := h.getCredentials()
+	if creds == nil {
 		h.Log.Debug("Dynatrace service credentials not found!")
 		return nil
 	}
 
 	h.Log.Info("Dynatrace service credentials found. Setting up Dynatrace PaaS agent.")
 
-	installerPath := filepath.Join(os.TempDir(), "paasInstaller.sh")
-	url := h.getDownloadURL(credentials)
+	// Download installer...
 
-	h.Log.Info("Downloading '%s' to '%s'", url, installerPath)
-	if err = h.download(url, installerPath); err != nil {
-		if credentials.SkipErrors {
+	installerFilePath := filepath.Join(os.TempDir(), "paasInstaller.sh")
+	url := h.getDownloadURL(creds)
+
+	h.Log.Info("Downloading '%s' to '%s'", url, installerFilePath)
+	if err = h.download(url, installerFilePath); err != nil {
+		if creds.SkipErrors {
 			h.Log.Warning("Error during installer download, skipping installation")
 			return nil
 		}
 		return err
 	}
 
-	h.Log.Debug("Making %s executable...", installerPath)
-	os.Chmod(installerPath, 0755)
+	// Run installer...
+
+	h.Log.Debug("Making %s executable...", installerFilePath)
+	os.Chmod(installerFilePath, 0755)
 
 	h.Log.BeginStep("Starting Dynatrace PaaS agent installer")
 
 	if os.Getenv("BP_DEBUG") != "" {
-		err = h.Command.Execute("", os.Stdout, os.Stderr, installerPath, stager.BuildDir())
+		err = h.Command.Execute("", os.Stdout, os.Stderr, installerFilePath, stager.BuildDir())
 	} else {
-		err = h.Command.Execute("", ioutil.Discard, ioutil.Discard, installerPath, stager.BuildDir())
+		err = h.Command.Execute("", ioutil.Discard, ioutil.Discard, installerFilePath, stager.BuildDir())
 	}
 	if err != nil {
 		return err
 	}
 
 	h.Log.Info("Dynatrace PaaS agent installed.")
+
+	// Post-installation setup...
 
 	dynatraceEnvName := "dynatrace-env.sh"
 	installDir := filepath.Join("dynatrace", "oneagent")
@@ -133,7 +146,11 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 	return nil
 }
 
-func (h *Hook) getCredentials() (*Credentials, bool) {
+// getCredentials returns the configuration from the environment, or nil if not found. The credentials are represented
+// as a JSON object in the VCAP_SERVICES environment variable.
+func (h *Hook) getCredentials() *credentials {
+	// Represent the structure of the JSON object in VCAP_SERVICES for parsing.
+
 	var vcapServices map[string][]struct {
 		Name        string                 `json:"name"`
 		Credentials map[string]interface{} `json:"credentials"`
@@ -141,10 +158,10 @@ func (h *Hook) getCredentials() (*Credentials, bool) {
 
 	if err := json.Unmarshal([]byte(os.Getenv("VCAP_SERVICES")), &vcapServices); err != nil {
 		h.Log.Debug("Failed to unmarshal VCAP_SERVICES: %s", err)
-		return nil, false
+		return nil
 	}
 
-	var detectedCredentials []*Credentials
+	var found []*credentials
 
 	for _, services := range vcapServices {
 		for _, service := range services {
@@ -159,7 +176,7 @@ func (h *Hook) getCredentials() (*Credentials, bool) {
 				return ""
 			}
 
-			credentials := &Credentials{
+			creds := &credentials{
 				ServiceName:   service.Name,
 				EnvironmentID: queryString("environmentid"),
 				APIToken:      queryString("apitoken"),
@@ -167,40 +184,29 @@ func (h *Hook) getCredentials() (*Credentials, bool) {
 				SkipErrors:    queryString("skiperrors") == "true",
 			}
 
-			if credentials.EnvironmentID != "" && credentials.APIToken != "" {
-				detectedCredentials = append(detectedCredentials, credentials)
+			if creds.EnvironmentID != "" && creds.APIToken != "" {
+				found = append(found, creds)
 			}
 		}
 	}
 
-	if len(detectedCredentials) == 1 {
-		h.Log.Debug("Found one matching service: %s", detectedCredentials[0].ServiceName)
-		return detectedCredentials[0], true
+	if len(found) == 1 {
+		h.Log.Debug("Found one matching service: %s", found[0].ServiceName)
+		return found[0]
 	}
 
-	if len(detectedCredentials) > 1 {
+	if len(found) > 1 {
 		h.Log.Warning("More than one matching service found!")
 	}
 
-	return nil, false
+	return nil
 }
 
-func (h *Hook) appName() string {
-	var application struct {
-		Name string `json:"name"`
-	}
-
-	if err := json.Unmarshal([]byte(os.Getenv("VCAP_APPLICATION")), &application); err != nil {
-		return ""
-	}
-
-	return application.Name
-}
-
-func (h *Hook) download(url, installerPath string) error {
+// download gets url, and stores it as filePath, retrying a few more times if the downloads fail.
+func (h *Hook) download(url, filePath string) error {
 	const baseWaitTime = 3 * time.Second
 
-	out, err := os.Create(installerPath)
+	out, err := os.Create(filePath)
 	if err != nil {
 		return err
 	}
@@ -209,9 +215,10 @@ func (h *Hook) download(url, installerPath string) error {
 	for i := 0; ; i++ {
 		var resp *http.Response
 		if resp, err = http.Get(url); err == nil {
-			// TODO: are partial writes possible?
+			// TODO: are partial writes possible? We'd need to either recreate the file, or seek the start of the file.
 			_, err = io.Copy(out, resp.Body)
-			resp.Body.Close()
+
+			resp.Body.Close() // Ignore error, nothing worth doing if it fails.
 
 			if resp.StatusCode < 400 && err == nil {
 				return nil
@@ -238,7 +245,7 @@ func (h *Hook) download(url, installerPath string) error {
 	}
 }
 
-func (h *Hook) getDownloadURL(c *Credentials) string {
+func (h *Hook) getDownloadURL(c *credentials) string {
 	apiURL := c.APIURL
 	if apiURL == "" {
 		apiURL = fmt.Sprintf("https://%s.live.dynatrace.com/api", c.EnvironmentID)
@@ -263,9 +270,11 @@ func (h *Hook) getDownloadURL(c *Credentials) string {
 // findAgentPath reads the manifest file included in the PaaS agent package, and looks
 // for the process agent file path.
 func (h *Hook) findAgentPath(installDir string) (string, error) {
+	// With these classes, we try to replicate the structure for the manifest.json file, so that we can parse it.
+
 	type Binary struct {
 		Path       string `json:"path"`
-		BinaryType string `json:"binarytype,omitempty"`
+		BinaryType string `json:"binarytype"`
 	}
 
 	type Architecture map[string][]Binary
@@ -297,7 +306,7 @@ func (h *Hook) findAgentPath(installDir string) (string, error) {
 		}
 	}
 
-	// Using fallback path.
+	// Using fallback path if we don't find the 'primary' process agent.
 	h.Log.Warning("Agent path not found in manifest.json, using fallback!")
 	return fallbackPath, nil
 }
