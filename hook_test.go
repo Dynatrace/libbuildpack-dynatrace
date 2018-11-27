@@ -195,7 +195,7 @@ var _ = Describe("dynatraceHook", func() {
 				err = hook.AfterCompile(stager)
 				Expect(err).To(BeNil())
 
-				Expect(buffer.String()).To(Equal(""))
+				Expect(buffer.String()).Should(ContainSubstring("Incomplete credentials for service"))
 			})
 		})
 
@@ -304,12 +304,12 @@ var _ = Describe("dynatraceHook", func() {
 			})
 		})
 
-		Context("VCAP_SERVICES contains dynatrace service using environmentid redis service", func() {
+		Context("VCAP_SERVICES contains dynatrace service using environmentid redis service and mixed-case service name", func() {
 			BeforeEach(func() {
 				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
 				os.Setenv("VCAP_SERVICES", `{
 					"0": [{"name":"mysql"}],
-					"1": [{"name":"dynatrace","credentials":{"environmentid":"`+environmentID+`","apitoken":"`+apiToken+`"}}],
+					"1": [{"name":"dyNaTRace","credentials":{"environmentid":"`+environmentID+`","apitoken":"`+apiToken+`"}}],
 					"2": [{"name":"redis", "credentials":{"db_type":"redis", "instance_administration_api":{"deployment_id":"12345asdf", "instance_id":"12345asdf", "root":"https://doesnotexi.st"}}}]
 				}`)
 

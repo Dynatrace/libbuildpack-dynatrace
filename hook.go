@@ -165,7 +165,7 @@ func (h *Hook) getCredentials() *credentials {
 
 	for _, services := range vcapServices {
 		for _, service := range services {
-			if !strings.Contains(service.Name, "dynatrace") {
+			if !strings.Contains(strings.ToLower(service.Name), "dynatrace") {
 				continue
 			}
 
@@ -186,6 +186,9 @@ func (h *Hook) getCredentials() *credentials {
 
 			if creds.EnvironmentID != "" && creds.APIToken != "" {
 				found = append(found, creds)
+			} else if creds.EnvironmentID != "" || creds.APIToken != "" { // One of the fields is empty.
+				h.Log.Info("Incomplete credentials for service: %s, environment ID: %s, API token: %s", creds.ServiceName,
+					creds.EnvironmentID, creds.APIToken)
 			}
 		}
 	}
