@@ -1,4 +1,4 @@
-# dt-cf-buildpack-integration
+# libbuildpack-dynatrace
 
 Base Library for Go-based Cloud Foundry Buildpack integrations with Dynatrace.
 
