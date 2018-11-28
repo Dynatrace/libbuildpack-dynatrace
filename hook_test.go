@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/Dynatrace/dt-cf-buildpack-integration"
+	"github.com/Dynatrace/libbuildpack-dynatrace"
 	"github.com/cloudfoundry/libbuildpack"
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"

@@ -13,7 +13,7 @@ import (
 	"os"
 
 	"github.com/cloudfoundry/libbuildpack"
-	"github.com/Dynatrace/dt-cf-buildpack-integration"
+	"github.com/Dynatrace/libbuildpack-dynatrace"
 )
 
 func init() {

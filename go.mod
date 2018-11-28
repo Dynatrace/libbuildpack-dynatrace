@@ -1,4 +1,4 @@
-module github.com/Dynatrace/dt-cf-buildpack-integration
+module github.com/Dynatrace/libbuildpack-dynatrace
 
 require (
 	github.com/Masterminds/semver v1.4.2 // indirect
