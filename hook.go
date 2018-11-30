@@ -44,6 +44,17 @@ type Hook struct {
 	MaxDownloadRetries int
 }
 
+// NewHook returns a libbuildpack.Hook instance for integrating monitoring with Dynatrace. The technology names for the
+// agents to download can be set as parameters.
+func NewHook(technologies ...string) libbuildpack.Hook {
+	return &Hook{
+		Log:                 libbuildpack.NewLogger(os.Stdout),
+		Command:             &libbuildpack.Command{},
+		IncludeTechnologies: technologies,
+		MaxDownloadRetries:  3,
+	}
+}
+
 // AfterCompile downloads and installs the Dynatrace agent.
 func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 	var err error

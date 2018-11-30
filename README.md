@@ -10,19 +10,12 @@ On the buildpacks, you're expected to provide a hook through a `init()` function
 
 ```go
 import (
-	"os"
-
 	"github.com/cloudfoundry/libbuildpack"
 	"github.com/Dynatrace/libbuildpack-dynatrace"
 )
 
 func init() {
-	libbuildpack.AddHook(dynatrace.Hook{
-		Log:                 libbuildpack.NewLogger(os.Stdout),
-		Command:             &libbuildpack.Command{},
-		IncludeTechnologies: []string {"nodejs", "process"},
-		MaxDownloadRetries:  3,
-	})
+	libbuildpack.AddHook(dynatrace.NewHook("nodejs", "process"))
 }
 ```
 
