@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
@@ -365,6 +366,48 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CF_BUILDPACK_LANGUAGE=test42 CF_BUILDPA
 
 				httpmock.RegisterResponder("GET", "https://"+environmentID+".live.dynatrace.com/api/v1/deployment/installer/agent/unix/paas-sh/latest?Api-Token="+apiToken+"&bitness=64&include=nginx&include=process&include=dotnet",
 					httpmock.NewStringResponder(200, "echo Install Dynatrace"))
+			})
+
+			It("installs dynatrace", func() {
+				mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(runInstaller)
+
+				err = hook.AfterCompile(stager)
+				Expect(err).To(BeNil())
+
+				// Sets up profile.d
+				contents, err := ioutil.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", "dynatrace-env.sh"))
+				Expect(err).To(BeNil())
+
+				Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
+export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so
+export DT_LOGSTREAM=stdout
+export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CF_BUILDPACK_LANGUAGE=test42 CF_BUILDPACK_VERSION=1.2.3"`))
+			})
+		})
+
+		Context("VCAP_SERVICES contains dynatrace service and fails the first download", func() {
+			BeforeEach(func() {
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Setenv("VCAP_SERVICES", `{
+					"0": [{"name":"mysql"}],
+					"1": [{"name":"dynatrace","credentials":{"apiurl":"https://example.com","apitoken":"`+apiToken+`","environmentid":"`+environmentID+`"}}],
+					"2": [{"name":"redis"}]
+				}`)
+
+				hook.MaxDownloadRetries = 1
+				attempt := 0
+
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?Api-Token="+apiToken+"&bitness=64&include=nginx&include=process&include=dotnet",
+					func(req *http.Request) (*http.Response, error) {
+						if attempt += 1; attempt == 1 {
+							return httpmock.NewStringResponse(500, `{"error": "Server failure"}`), nil
+						}
+						return httpmock.NewStringResponse(200, "echo Install Dynatrace"), nil
+					})
+			})
+
+			AfterEach(func() {
+				hook.MaxDownloadRetries = 0
 			})
 
 			It("installs dynatrace", func() {
