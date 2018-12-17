@@ -148,6 +148,17 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 		extra += "\nexport DT_LOGSTREAM=stdout"
 	}
 
+	lang := stager.BuildpackLanguage()
+	ver, err := stager.BuildpackVersion()
+	if err != nil {
+		h.Log.Warning("Failed to get buildpack version: %v", err)
+		ver = "unknown"
+	}
+
+	h.Log.Debug("Preparing custom properties...")
+	extra += fmt.Sprintf(
+		"\nexport DT_CUSTOM_PROP=\"${DT_CUSTOM_PROP} CF_BUILDPACK_LANGUAGE=%s CF_BUILDPACK_VERSION=%s\"", lang, ver)
+
 	if _, err = f.WriteString(extra); err != nil {
 		return err
 	}

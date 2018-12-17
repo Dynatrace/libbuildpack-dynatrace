@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/Dynatrace/libbuildpack-dynatrace"
 	"github.com/cloudfoundry/libbuildpack"
@@ -22,6 +23,7 @@ import (
 var _ = Describe("dynatraceHook", func() {
 	var (
 		err          error
+		bpDir        string
 		buildDir     string
 		depsDir      string
 		depsIdx      string
@@ -35,10 +37,13 @@ var _ = Describe("dynatraceHook", func() {
 	)
 
 	BeforeEach(func() {
-		buildDir, err = ioutil.TempDir("", "staticfile-buildpack.build.")
+		bpDir, err = ioutil.TempDir("", "libbuildpack-dynatrace.buildpack.")
 		Expect(err).To(BeNil())
 
-		depsDir, err = ioutil.TempDir("", "staticfile-buildpack.deps.")
+		buildDir, err = ioutil.TempDir("", "libbuildpack-dynatrace.build.")
+		Expect(err).To(BeNil())
+
+		depsDir, err = ioutil.TempDir("", "libbuildpack-dynatrace.deps.")
 		Expect(err).To(BeNil())
 
 		depsIdx = "07"
@@ -57,6 +62,9 @@ var _ = Describe("dynatraceHook", func() {
 		}
 
 		os.Setenv("DT_LOGSTREAM", "")
+
+		ioutil.WriteFile(filepath.Join(bpDir, "manifest.yml"), []byte("---\nlanguage: test42\n"), 0755)
+		ioutil.WriteFile(filepath.Join(bpDir, "VERSION"), []byte("1.2.3"), 0755)
 
 		httpmock.Reset()
 
@@ -99,13 +107,20 @@ var _ = Describe("dynatraceHook", func() {
 
 	JustBeforeEach(func() {
 		args := []string{buildDir, "", depsDir, depsIdx}
-		stager = libbuildpack.NewStager(args, logger, &libbuildpack.Manifest{})
+
+		manifest, err := libbuildpack.NewManifest(bpDir, logger, time.Now())
+		Expect(err).To(BeNil())
+
+		stager = libbuildpack.NewStager(args, logger, manifest)
 	})
 
 	AfterEach(func() {
 		mockCtrl.Finish()
 
 		err = os.RemoveAll(buildDir)
+		Expect(err).To(BeNil())
+
+		err = os.RemoveAll(bpDir)
 		Expect(err).To(BeNil())
 
 		err = os.RemoveAll(depsDir)
@@ -240,9 +255,10 @@ var _ = Describe("dynatraceHook", func() {
 				contents, err := ioutil.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", "dynatrace-env.sh"))
 				Expect(err).To(BeNil())
 
-				Expect(string(contents)).To(Equal("echo running dynatrace-env.sh\n" +
-					"export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so\n" +
-					"export DT_LOGSTREAM=stdout"))
+				Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
+export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so
+export DT_LOGSTREAM=stdout
+export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CF_BUILDPACK_LANGUAGE=test42 CF_BUILDPACK_VERSION=1.2.3"`))
 			})
 		})
 
@@ -270,8 +286,9 @@ var _ = Describe("dynatraceHook", func() {
 				contents, err := ioutil.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", "dynatrace-env.sh"))
 				Expect(err).To(BeNil())
 
-				Expect(string(contents)).To(Equal("echo running dynatrace-env.sh\n" +
-					"export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so"))
+				Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
+export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so
+export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CF_BUILDPACK_LANGUAGE=test42 CF_BUILDPACK_VERSION=1.2.3"`))
 			})
 		})
 
@@ -298,9 +315,42 @@ var _ = Describe("dynatraceHook", func() {
 				contents, err := ioutil.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", "dynatrace-env.sh"))
 				Expect(err).To(BeNil())
 
-				Expect(string(contents)).To(Equal("echo running dynatrace-env.sh\n" +
-					"export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so\n" +
-					"export DT_LOGSTREAM=stdout"))
+				Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
+export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so
+export DT_LOGSTREAM=stdout
+export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CF_BUILDPACK_LANGUAGE=test42 CF_BUILDPACK_VERSION=1.2.3"`))
+			})
+		})
+
+		Context("VCAP_SERVICES contains dynatrace service using apiurl and VERSION is not available", func() {
+			BeforeEach(func() {
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Setenv("VCAP_SERVICES", `{
+					"0": [{"name":"mysql"}],
+					"1": [{"name":"dynatrace","credentials":{"apiurl":"https://example.com","apitoken":"`+apiToken+`","environmentid":"`+environmentID+`"}}],
+					"2": [{"name":"redis"}]
+				}`)
+
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?Api-Token="+apiToken+"&bitness=64&include=nginx&include=process&include=dotnet",
+					httpmock.NewStringResponder(200, "echo Install Dynatrace"))
+
+				os.Remove(filepath.Join(bpDir, "VERSION"))
+			})
+
+			It("installs dynatrace", func() {
+				mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(runInstaller)
+
+				err = hook.AfterCompile(stager)
+				Expect(err).To(BeNil())
+
+				// Sets up profile.d
+				contents, err := ioutil.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", "dynatrace-env.sh"))
+				Expect(err).To(BeNil())
+
+				Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
+export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so
+export DT_LOGSTREAM=stdout
+export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CF_BUILDPACK_LANGUAGE=test42 CF_BUILDPACK_VERSION=unknown"`))
 			})
 		})
 
@@ -327,9 +377,10 @@ var _ = Describe("dynatraceHook", func() {
 				contents, err := ioutil.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", "dynatrace-env.sh"))
 				Expect(err).To(BeNil())
 
-				Expect(string(contents)).To(Equal("echo running dynatrace-env.sh\n" +
-					"export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so\n" +
-					"export DT_LOGSTREAM=stdout"))
+				Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
+export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so
+export DT_LOGSTREAM=stdout
+export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CF_BUILDPACK_LANGUAGE=test42 CF_BUILDPACK_VERSION=1.2.3"`))
 			})
 		})
 
