@@ -157,7 +157,7 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 
 	h.Log.Debug("Preparing custom properties...")
 	extra += fmt.Sprintf(
-		"\nexport DT_CUSTOM_PROP=\"${DT_CUSTOM_PROP} CF_BUILDPACK_LANGUAGE=%s CF_BUILDPACK_VERSION=%s\"", lang, ver)
+		"\nexport DT_CUSTOM_PROP=\"${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=%s CloudFoundryBuildpackVersion=%s\"", lang, ver)
 
 	if _, err = f.WriteString(extra); err != nil {
 		return err
