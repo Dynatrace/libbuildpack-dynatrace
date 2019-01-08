@@ -259,7 +259,7 @@ var _ = Describe("dynatraceHook", func() {
 				Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
 export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so
 export DT_LOGSTREAM=stdout
-export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CF_BUILDPACK_LANGUAGE=test42 CF_BUILDPACK_VERSION=1.2.3"`))
+export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"`))
 			})
 		})
 
@@ -289,7 +289,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CF_BUILDPACK_LANGUAGE=test42 CF_BUILDPA
 
 				Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
 export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so
-export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CF_BUILDPACK_LANGUAGE=test42 CF_BUILDPACK_VERSION=1.2.3"`))
+export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"`))
 			})
 		})
 
@@ -319,7 +319,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CF_BUILDPACK_LANGUAGE=test42 CF_BUILDPA
 				Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
 export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so
 export DT_LOGSTREAM=stdout
-export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CF_BUILDPACK_LANGUAGE=test42 CF_BUILDPACK_VERSION=1.2.3"`))
+export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"`))
 			})
 		})
 
@@ -351,7 +351,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CF_BUILDPACK_LANGUAGE=test42 CF_BUILDPA
 				Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
 export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so
 export DT_LOGSTREAM=stdout
-export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CF_BUILDPACK_LANGUAGE=test42 CF_BUILDPACK_VERSION=unknown"`))
+export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=unknown"`))
 			})
 		})
 
@@ -381,7 +381,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CF_BUILDPACK_LANGUAGE=test42 CF_BUILDPA
 				Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
 export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so
 export DT_LOGSTREAM=stdout
-export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CF_BUILDPACK_LANGUAGE=test42 CF_BUILDPACK_VERSION=1.2.3"`))
+export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"`))
 			})
 		})
 
@@ -423,7 +423,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CF_BUILDPACK_LANGUAGE=test42 CF_BUILDPA
 				Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
 export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so
 export DT_LOGSTREAM=stdout
-export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CF_BUILDPACK_LANGUAGE=test42 CF_BUILDPACK_VERSION=1.2.3"`))
+export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"`))
 			})
 		})
 
