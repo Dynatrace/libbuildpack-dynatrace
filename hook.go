@@ -29,6 +29,7 @@ type credentials struct {
 	APIToken      string
 	APIURL        string
 	SkipErrors    bool
+	Location      string
 }
 
 // Hook implements libbuildpack.Hook. It downloads and install the Dynatrace PaaS OneAgent.
@@ -150,6 +151,11 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 	h.Log.Debug("Setting LD_PRELOAD...")
 	extra += fmt.Sprintf("\nexport LD_PRELOAD=${HOME}/%s", agentLibPath)
 
+	if creds.Location != "" {
+		h.Log.Debug("Setting DT_LOCATION...")
+		extra += fmt.Sprintf("\nexport DT_LOCATION=${DT_LOCATION:-%s}", creds.Location)
+	}
+
 	// By default, OneAgent logs are printed to stderr. If the customer doesn't override this behavior through an
 	// environment variable, then we change the default output to stdout.
 	if os.Getenv("DT_LOGSTREAM") == "" {
@@ -206,6 +212,7 @@ func (h *Hook) getCredentials() *credentials {
 				APIToken:      queryString("apitoken"),
 				APIURL:        queryString("apiurl"),
 				SkipErrors:    queryString("skiperrors") == "true",
+				Location:      queryString("location"),
 			}
 
 			if creds.EnvironmentID != "" && creds.APIToken != "" {

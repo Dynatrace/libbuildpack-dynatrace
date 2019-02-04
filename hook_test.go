@@ -444,6 +444,34 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 		})
 
+		Context("VCAP_SERVICES contains dynatrace service with location", func() {
+			BeforeEach(func() {
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Setenv("VCAP_SERVICES", `{
+					"0": [{"name":"dynatrace","credentials":{"apitoken":"`+apiToken+`","environmentid":"`+environmentID+`","location":"west-us"}}]
+				}`)
+
+				httpmock.RegisterResponder("GET", "https://"+environmentID+".live.dynatrace.com/api/v1/deployment/installer/agent/unix/paas-sh/latest?Api-Token="+apiToken+"&bitness=64&include=nginx&include=process&include=dotnet",
+					httpmock.NewStringResponder(200, "echo Install Dynatrace"))
+			})
+
+			It("installs dynatrace", func() {
+				mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(runInstaller)
+
+				Expect(hook.AfterCompile(stager)).Should(Succeed())
+
+				// Sets up profile.d
+				contents, err := ioutil.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", "dynatrace-env.sh"))
+				Expect(err).Should(Succeed())
+
+				Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
+export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so
+export DT_LOCATION=${DT_LOCATION:-west-us}
+export DT_LOGSTREAM=stdout
+export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"`))
+			})
+		})
+
 		Context("VCAP_SERVICES contains skiperrors flag", func() {
 			BeforeEach(func() {
 				os.Setenv("BP_DEBUG", "true")
