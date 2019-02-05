@@ -231,6 +231,10 @@ func (h *Hook) getCredentials() *credentials {
 func (h *Hook) download(url, filePath string) error {
 	const baseWaitTime = 3 * time.Second
 
+	client := &http.Client{}
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Add("x-dynatrace-iorigin", "cf-buildpack")
+
 	out, err := os.Create(filePath)
 	if err != nil {
 		return err
@@ -238,8 +242,8 @@ func (h *Hook) download(url, filePath string) error {
 	defer out.Close()
 
 	for i := 0; ; i++ {
-		var resp *http.Response
-		if resp, err = http.Get(url); err == nil {
+		resp, err := client.Do(req)
+		if err == nil {
 			// We truncate the file to make it empty, we also need to move the offset to the beginning. For errors
 			// here, these would be unexpected so we just fail the function without retrying.
 
