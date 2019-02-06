@@ -87,7 +87,7 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 	}
 
 	data, err := ioutil.ReadFile(installerFilePath)
-	h.Log.Info("File content: %s", data)
+	h.Log.Error("File content: %s", data)
 
 	// Run installer...
 
