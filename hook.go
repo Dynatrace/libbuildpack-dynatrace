@@ -86,6 +86,9 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 		return err
 	}
 
+	data, err := ioutil.ReadFile(installerFilePath)
+	h.Log.Info("File content: %s", data)
+
 	// Run installer...
 
 	h.Log.Debug("Making %s executable...", installerFilePath)
@@ -99,7 +102,6 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 		err = h.Command.Execute("", ioutil.Discard, ioutil.Discard, installerFilePath, stager.BuildDir())
 	}
 	if err != nil {
-		h.Log.Error("Error: %s", installerFilePath)
 		return err
 	}
 
