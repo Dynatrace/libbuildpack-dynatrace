@@ -71,13 +71,22 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 
 	h.Log.Info("Dynatrace service credentials found. Setting up Dynatrace PaaS agent.")
 
+	// Get buildpack version and language
+
+	lang := stager.BuildpackLanguage()
+	ver, err := stager.BuildpackVersion()
+	if err != nil {
+		h.Log.Warning("Failed to get buildpack version: %v", err)
+		ver = "unknown"
+	}
+
 	// Download installer...
 
 	installerFilePath := filepath.Join(os.TempDir(), "paasInstaller.sh")
 	url := h.getDownloadURL(creds)
 
 	h.Log.Info("Downloading '%s' to '%s'", url, installerFilePath)
-	if err = h.download(url, installerFilePath); err != nil {
+	if err = h.download(url, installerFilePath, ver, lang); err != nil {
 		if creds.SkipErrors {
 			h.Log.Warning("Error during installer download, skipping installation")
 			return nil
@@ -146,13 +155,6 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 	if os.Getenv("DT_LOGSTREAM") == "" {
 		h.Log.Debug("Setting DT_LOGSTREAM to stdout...")
 		extra += "\nexport DT_LOGSTREAM=stdout"
-	}
-
-	lang := stager.BuildpackLanguage()
-	ver, err := stager.BuildpackVersion()
-	if err != nil {
-		h.Log.Warning("Failed to get buildpack version: %v", err)
-		ver = "unknown"
 	}
 
 	h.Log.Debug("Preparing custom properties...")
@@ -228,12 +230,12 @@ func (h *Hook) getCredentials() *credentials {
 }
 
 // download gets url, and stores it as filePath, retrying a few more times if the downloads fail.
-func (h *Hook) download(url, filePath string) error {
+func (h *Hook) download(url, filePath string, buildPackVersion string, language string) error {
 	const baseWaitTime = 3 * time.Second
 
 	client := &http.Client{}
-	req, _ := http.NewRequest("GET", url, nil)
-	req.Header.Add("x-dynatrace-iorigin", "cf-buildpack")
+	req, _ := http.NewRequest("GET", "http://httpbin.org/get", nil)
+	req.Header.Set("User-Agent", fmt.Sprintf("cf-%s-buildpack/%s", language, buildPackVersion))
 
 	out, err := os.Create(filePath)
 	if err != nil {
