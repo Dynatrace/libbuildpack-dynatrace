@@ -94,9 +94,6 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 		return err
 	}
 
-	data, err := ioutil.ReadFile(installerFilePath)
-	h.Log.Info("File content: %s", data)
-
 	// Run installer...
 
 	h.Log.Debug("Making %s executable...", installerFilePath)
@@ -237,7 +234,7 @@ func (h *Hook) download(url, filePath string, buildPackVersion string, language 
 	const baseWaitTime = 3 * time.Second
 
 	client := &http.Client{}
-	req, _ := http.NewRequest("GET", "http://httpbin.org/get", nil)
+	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("User-Agent", fmt.Sprintf("cf-%s-buildpack/%s", language, buildPackVersion))
 
 	out, err := os.Create(filePath)
