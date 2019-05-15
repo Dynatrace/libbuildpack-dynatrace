@@ -15,8 +15,7 @@ import (
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	"gopkg.in/jarcoal/httpmock.v1"
+	"github.com/jarcoal/httpmock"
 )
 
 //go:generate mockgen -source=hook.go --destination=mocks_test.go --package=dynatrace_test
