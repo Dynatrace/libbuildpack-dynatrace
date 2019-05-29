@@ -466,7 +466,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 
 				Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
 export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so
-export DT_LOCATION=${DT_LOCATION:-west-us}
+export DT_NETWORK_ZONE=${DT_NETWORK_ZONE:-west-us}
 export DT_LOGSTREAM=stdout
 export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"`))
 			})
