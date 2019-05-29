@@ -212,7 +212,7 @@ func (h *Hook) getCredentials() *credentials {
 				APIToken:      queryString("apitoken"),
 				APIURL:        queryString("apiurl"),
 				SkipErrors:    queryString("skiperrors") == "true",
-				Location:      queryString("location"),
+				Location:      queryString("networkzone"),
 			}
 
 			if creds.EnvironmentID != "" && creds.APIToken != "" {
