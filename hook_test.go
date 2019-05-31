@@ -448,7 +448,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			BeforeEach(func() {
 				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
 				os.Setenv("VCAP_SERVICES", `{
-					"0": [{"name":"dynatrace","credentials":{"apitoken":"`+apiToken+`","environmentid":"`+environmentID+`","location":"west-us"}}]
+					"0": [{"name":"dynatrace","credentials":{"apitoken":"`+apiToken+`","environmentid":"`+environmentID+`","networkzone":"west-us"}}]
 				}`)
 
 				httpmock.RegisterResponder("GET", "https://"+environmentID+".live.dynatrace.com/api/v1/deployment/installer/agent/unix/paas-sh/latest?Api-Token="+apiToken+"&bitness=64&include=nginx&include=process&include=dotnet",
