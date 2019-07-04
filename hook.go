@@ -32,7 +32,7 @@ type credentials struct {
 	NetworkZone   string
 }
 
-// Hook implements libbuildpack.Hook. It downloads and install the Dynatrace PaaS OneAgent.
+// Hook implements libbuildpack.Hook. It downloads and install the Dynatrace OneAgent.
 type Hook struct {
 	libbuildpack.DefaultHook
 	Log     *libbuildpack.Logger
@@ -70,7 +70,7 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 		return nil
 	}
 
-	h.Log.Info("Dynatrace service credentials found. Setting up Dynatrace PaaS agent.")
+	h.Log.Info("Dynatrace service credentials found. Setting up Dynatrace OneAgent.")
 
 	// Get buildpack version and language
 
@@ -100,7 +100,7 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 	h.Log.Debug("Making %s executable...", installerFilePath)
 	os.Chmod(installerFilePath, 0755)
 
-	h.Log.BeginStep("Starting Dynatrace PaaS agent installer")
+	h.Log.BeginStep("Starting Dynatrace OneAgent installer")
 
 	if os.Getenv("BP_DEBUG") != "" {
 		err = h.Command.Execute("", os.Stdout, os.Stderr, installerFilePath, stager.BuildDir())
@@ -111,7 +111,7 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 		return err
 	}
 
-	h.Log.Info("Dynatrace PaaS agent installed.")
+	h.Log.Info("Dynatrace OneAgent installed.")
 
 	// Post-installation setup...
 
@@ -132,7 +132,7 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 		return err
 	}
 
-	h.Log.BeginStep("Setting up Dynatrace PaaS agent injection...")
+	h.Log.BeginStep("Setting up Dynatrace OneAgent injection...")
 	h.Log.Debug("Copy %s to %s", dynatraceEnvName, dynatraceEnvPath)
 	if err = libbuildpack.CopyFile(filepath.Join(stager.BuildDir(), installDir, dynatraceEnvName), dynatraceEnvPath); err != nil {
 		return err
@@ -171,7 +171,7 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 		return err
 	}
 
-	h.Log.Info("Dynatrace PaaS agent injection is set up.")
+	h.Log.Info("Dynatrace OneAgent injection is set up.")
 
 	return nil
 }
@@ -318,7 +318,7 @@ func (h *Hook) getDownloadURL(c *credentials) string {
 	return u.String()
 }
 
-// findAgentPath reads the manifest file included in the PaaS agent package, and looks
+// findAgentPath reads the manifest file included in the OneAgent package, and looks
 // for the process agent file path.
 func (h *Hook) findAgentPath(installDir string) (string, error) {
 	// With these classes, we try to replicate the structure for the manifest.json file, so that we can parse it.
