@@ -87,7 +87,7 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 	url := h.getDownloadURL(creds)
 
 	h.Log.Info("Downloading '%s' to '%s'", url, installerFilePath)
-	if err = h.download(url, installerFilePath, ver, lang); err != nil {
+	if err = h.download(url, installerFilePath, ver, lang, creds); err != nil {
 		if creds.SkipErrors {
 			h.Log.Warning("Error during installer download, skipping installation")
 			return nil
@@ -237,12 +237,13 @@ func (h *Hook) getCredentials() *credentials {
 }
 
 // download gets url, and stores it as filePath, retrying a few more times if the downloads fail.
-func (h *Hook) download(url, filePath string, buildPackVersion string, language string) error {
+func (h *Hook) download(url, filePath string, buildPackVersion string, language string, creds *credentials) error {
 	const baseWaitTime = 3 * time.Second
 
 	client := &http.Client{}
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("User-Agent", fmt.Sprintf("cf-%s-buildpack/%s", language, buildPackVersion))
+	req.Header.Set("Authorization", creds.APIToken)
 
 	out, err := os.Create(filePath)
 	if err != nil {
