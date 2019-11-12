@@ -245,7 +245,7 @@ func (h *Hook) download(url, filePath string, buildPackVersion string, language 
 	req.Header.Set("User-Agent", fmt.Sprintf("cf-%s-buildpack/%s", language, buildPackVersion))
 	
 	h.Log.Debug("Setting Authorization Header...")
-	req.Header.Set("Authorization", creds.APIToken)
+	req.Header.Set("Authorization", fmt.Sprintf("Api-Token %s", creds.APIToken))
 
 	out, err := os.Create(filePath)
 	if err != nil {
