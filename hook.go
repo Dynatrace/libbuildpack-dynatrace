@@ -243,6 +243,8 @@ func (h *Hook) download(url, filePath string, buildPackVersion string, language 
 	client := &http.Client{}
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("User-Agent", fmt.Sprintf("cf-%s-buildpack/%s", language, buildPackVersion))
+	
+	h.Log.Debug("Setting Authorization Header...")
 	req.Header.Set("Authorization", creds.APIToken)
 
 	out, err := os.Create(filePath)
@@ -309,7 +311,7 @@ func (h *Hook) getDownloadURL(c *credentials) string {
 	}
 
 	qv := make(url.Values)
-	qv.Add("Api-Token", c.APIToken)
+	//qv.Add("Api-Token", c.APIToken)
 	qv.Add("bitness", "64")
 	for _, t := range h.IncludeTechnologies {
 		qv.Add("include", t)
