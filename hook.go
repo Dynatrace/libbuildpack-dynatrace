@@ -309,7 +309,7 @@ func (h *Hook) getDownloadURL(c *credentials) string {
 	}
 
 	qv := make(url.Values)
-	//qv.Add("Api-Token", c.APIToken)
+	qv.Add("Api-Token", c.APIToken)
 	qv.Add("bitness", "64")
 	for _, t := range h.IncludeTechnologies {
 		qv.Add("include", t)
