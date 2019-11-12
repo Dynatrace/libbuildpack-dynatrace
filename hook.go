@@ -243,8 +243,6 @@ func (h *Hook) download(url, filePath string, buildPackVersion string, language 
 	client := &http.Client{}
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("User-Agent", fmt.Sprintf("cf-%s-buildpack/%s", language, buildPackVersion))
-
-	h.Log.Debug("Setting Auth Header")
 	req.Header.Set("Authorization", fmt.Sprintf("Api-Token %s", creds.APIToken))
 
 	out, err := os.Create(filePath)
