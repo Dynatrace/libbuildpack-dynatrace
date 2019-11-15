@@ -7,10 +7,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/Dynatrace/libbuildpack-dynatrace"
+	dynatrace "github.com/Dynatrace/libbuildpack-dynatrace"
 	"github.com/cloudfoundry/libbuildpack"
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
@@ -23,18 +24,19 @@ import (
 
 var _ = Describe("dynatraceHook", func() {
 	var (
-		err          error
-		bpDir        string
-		buildDir     string
-		depsDir      string
-		depsIdx      string
-		logger       *libbuildpack.Logger
-		stager       *libbuildpack.Stager
-		mockCtrl     *gomock.Controller
-		mockCommand  *MockCommand
-		buffer       *bytes.Buffer
-		hook         dynatrace.Hook
-		runInstaller func(string, io.Writer, io.Writer, string, string)
+		err              error
+		bpDir            string
+		buildDir         string
+		depsDir          string
+		depsIdx          string
+		logger           *libbuildpack.Logger
+		stager           *libbuildpack.Stager
+		mockCtrl         *gomock.Controller
+		mockCommand      *MockCommand
+		buffer           *bytes.Buffer
+		hook             dynatrace.Hook
+		runInstaller     func(string, io.Writer, io.Writer, string, string)
+		api_header_check func(req *http.Request) (*http.Response, error)
 	)
 
 	BeforeEach(func() {
@@ -60,6 +62,20 @@ var _ = Describe("dynatraceHook", func() {
 			Log:                 logger,
 			MaxDownloadRetries:  0,
 			IncludeTechnologies: []string{"nginx", "process", "dotnet"},
+		}
+
+		api_header_check = func(req *http.Request) (*http.Response, error) {
+			resp := httpmock.NewStringResponse(200, "echo Install Dynatrace")
+
+			resp_header := req.Header.Get("Authorization")
+			if resp_header == "" {
+				return httpmock.NewStringResponse(500, `{"error": "No Authorization Header found"}`), nil
+			}
+			if strings.Index(resp_header, "Api-Token") == -1 {
+				return httpmock.NewStringResponse(500, `{"error": "No Api-Token found in Authorization Header"}`), nil
+			}
+
+			return resp, nil
 		}
 
 		os.Setenv("DT_LOGSTREAM", "")
@@ -242,8 +258,8 @@ var _ = Describe("dynatraceHook", func() {
 					"2": [{"name":"redis"}]
 				}`)
 
-				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?Api-Token="+apiToken+"&bitness=64&include=nginx&include=process&include=dotnet",
-					httpmock.NewStringResponder(200, "echo Install Dynatrace"))
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
+					api_header_check)
 			})
 
 			It("installs dynatrace", func() {
@@ -273,8 +289,8 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 					"2": [{"name":"redis"}]
 				}`)
 
-				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?Api-Token="+apiToken+"&bitness=64&include=nginx&include=process&include=dotnet",
-					httpmock.NewStringResponder(200, "echo Install Dynatrace"))
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
+					api_header_check)
 			})
 
 			It("installs dynatrace", func() {
@@ -302,8 +318,8 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 					"2": [{"name":"redis"}]
 				}`)
 
-				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?Api-Token="+apiToken+"&bitness=64&include=nginx&include=process&include=dotnet",
-					httpmock.NewStringResponder(200, "echo Install Dynatrace"))
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
+					api_header_check)
 			})
 
 			It("installs dynatrace", func() {
@@ -332,8 +348,8 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 					"2": [{"name":"redis"}]
 				}`)
 
-				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?Api-Token="+apiToken+"&bitness=64&include=nginx&include=process&include=dotnet",
-					httpmock.NewStringResponder(200, "echo Install Dynatrace"))
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
+					api_header_check)
 
 				os.Remove(filepath.Join(bpDir, "VERSION"))
 			})
@@ -364,8 +380,8 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 					"2": [{"name":"redis", "credentials":{"db_type":"redis", "instance_administration_api":{"deployment_id":"12345asdf", "instance_id":"12345asdf", "root":"https://doesnotexi.st"}}}]
 				}`)
 
-				httpmock.RegisterResponder("GET", "https://"+environmentID+".live.dynatrace.com/api/v1/deployment/installer/agent/unix/paas-sh/latest?Api-Token="+apiToken+"&bitness=64&include=nginx&include=process&include=dotnet",
-					httpmock.NewStringResponder(200, "echo Install Dynatrace"))
+				httpmock.RegisterResponder("GET", "https://"+environmentID+".live.dynatrace.com/api/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
+					api_header_check)
 			})
 
 			It("installs dynatrace", func() {
@@ -397,7 +413,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				hook.MaxDownloadRetries = 1
 				attempt := 0
 
-				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?Api-Token="+apiToken+"&bitness=64&include=nginx&include=process&include=dotnet",
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
 					func(req *http.Request) (*http.Response, error) {
 						if attempt += 1; attempt == 1 {
 							return httpmock.NewStringResponse(500, `{"error": "Server failure"}`), nil
@@ -451,8 +467,8 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 					"0": [{"name":"dynatrace","credentials":{"apitoken":"`+apiToken+`","environmentid":"`+environmentID+`","networkzone":"west-us"}}]
 				}`)
 
-				httpmock.RegisterResponder("GET", "https://"+environmentID+".live.dynatrace.com/api/v1/deployment/installer/agent/unix/paas-sh/latest?Api-Token="+apiToken+"&bitness=64&include=nginx&include=process&include=dotnet",
-					httpmock.NewStringResponder(200, "echo Install Dynatrace"))
+				httpmock.RegisterResponder("GET", "https://"+environmentID+".live.dynatrace.com/api/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
+					api_header_check)
 			})
 
 			It("installs dynatrace", func() {
@@ -480,7 +496,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 					"0": [{"name":"dynatrace","credentials":{"environmentid":"`+environmentID+`","apitoken":"`+apiToken+`","skiperrors":"true"}}]
 				}`)
 
-				httpmock.RegisterResponder("GET", "https://"+environmentID+".live.dynatrace.com/api/v1/deployment/installer/agent/unix/paas-sh/latest?Api-Token="+apiToken+"&bitness=64&include=nginx&include=process&include=dotnet",
+				httpmock.RegisterResponder("GET", "https://"+environmentID+".live.dynatrace.com/api/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
 					httpmock.NewStringResponder(404, "echo agent not found"))
 			})
 
