@@ -26,6 +26,7 @@ type Command interface {
 type credentials struct {
 	ServiceName   string
 	EnvironmentID string
+	OneAgentURL   string
 	APIToken      string
 	APIURL        string
 	SkipErrors    bool
@@ -211,6 +212,7 @@ func (h *Hook) getCredentials() *credentials {
 				EnvironmentID: queryString("environmentid"),
 				APIToken:      queryString("apitoken"),
 				APIURL:        queryString("apiurl"),
+				OneAgentURL:   queryString("OneAgentURL"),
 				SkipErrors:    queryString("skiperrors") == "true",
 				NetworkZone:   queryString("networkzone"),
 			}
@@ -242,8 +244,10 @@ func (h *Hook) download(url, filePath string, buildPackVersion string, language 
 
 	client := &http.Client{}
 	req, _ := http.NewRequest("GET", url, nil)
-	req.Header.Set("User-Agent", fmt.Sprintf("cf-%s-buildpack/%s", language, buildPackVersion))
-	req.Header.Set("Authorization", fmt.Sprintf("Api-Token %s", creds.APIToken))
+	if creds.OneAgentURL == "" {
+		req.Header.Set("User-Agent", fmt.Sprintf("cf-%s-buildpack/%s", language, buildPackVersion))
+		req.Header.Set("Authorization", fmt.Sprintf("Api-Token %s", creds.APIToken))
+	}
 
 	out, err := os.Create(filePath)
 	if err != nil {
@@ -298,6 +302,10 @@ func (h *Hook) download(url, filePath string, buildPackVersion string, language 
 }
 
 func (h *Hook) getDownloadURL(c *credentials) string {
+	if c.OneAgentURL != "" {
+		return c.OneAgentURL
+	}
+
 	apiURL := c.APIURL
 	if apiURL == "" {
 		apiURL = fmt.Sprintf("https://%s.live.dynatrace.com/api", c.EnvironmentID)
