@@ -26,7 +26,7 @@ type Command interface {
 type credentials struct {
 	ServiceName   string
 	EnvironmentID string
-	OneAgentURL   string
+	CustomOneAgentURL   string
 	APIToken      string
 	APIURL        string
 	SkipErrors    bool
@@ -212,7 +212,7 @@ func (h *Hook) getCredentials() *credentials {
 				EnvironmentID: queryString("environmentid"),
 				APIToken:      queryString("apitoken"),
 				APIURL:        queryString("apiurl"),
-				OneAgentURL:   queryString("OneAgentURL"),
+				CustomOneAgentURL:   queryString("CustomOneAgentURL"),
 				SkipErrors:    queryString("skiperrors") == "true",
 				NetworkZone:   queryString("networkzone"),
 			}
@@ -244,7 +244,7 @@ func (h *Hook) download(url, filePath string, buildPackVersion string, language 
 
 	client := &http.Client{}
 	req, _ := http.NewRequest("GET", url, nil)
-	if creds.OneAgentURL == "" {
+	if creds.CustomOneAgentURL == "" {
 		req.Header.Set("User-Agent", fmt.Sprintf("cf-%s-buildpack/%s", language, buildPackVersion))
 		req.Header.Set("Authorization", fmt.Sprintf("Api-Token %s", creds.APIToken))
 	}
@@ -302,8 +302,8 @@ func (h *Hook) download(url, filePath string, buildPackVersion string, language 
 }
 
 func (h *Hook) getDownloadURL(c *credentials) string {
-	if c.OneAgentURL != "" {
-		return c.OneAgentURL
+	if c.CustomOneAgentURL != "" {
+		return c.CustomOneAgentURL
 	}
 
 	apiURL := c.APIURL
