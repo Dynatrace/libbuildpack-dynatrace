@@ -212,12 +212,12 @@ func (h *Hook) getCredentials() *credentials {
 				EnvironmentID: queryString("environmentid"),
 				APIToken:      queryString("apitoken"),
 				APIURL:        queryString("apiurl"),
-				CustomOneAgentURL:   queryString("CustomOneAgentURL"),
+				CustomOneAgentURL:   queryString("customoneagenturl"),
 				SkipErrors:    queryString("skiperrors") == "true",
 				NetworkZone:   queryString("networkzone"),
 			}
 
-			if creds.EnvironmentID != "" && creds.APIToken != "" {
+			if (creds.EnvironmentID != "" && creds.APIToken != "") || creds.CustomOneAgentURL != "" {
 				found = append(found, creds)
 			} else if !(creds.EnvironmentID == "" && creds.APIToken == "") { // One of the fields is empty.
 				h.Log.Warning("Incomplete credentials for service: %s, environment ID: %s, API token: %s", creds.ServiceName,
