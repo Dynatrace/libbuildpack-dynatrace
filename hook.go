@@ -318,6 +318,7 @@ func (h *Hook) getDownloadURL(c *credentials) string {
 
 	qv := make(url.Values)
 	qv.Add("bitness", "64")
+	qv.Add("networkzone", c.NetworkZone)
 	for _, t := range h.IncludeTechnologies {
 		qv.Add("include", t)
 	}
