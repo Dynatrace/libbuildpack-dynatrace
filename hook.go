@@ -321,6 +321,8 @@ func (h *Hook) getDownloadURL(c *credentials) string {
 	// only add the 'networkzone' parameter if it's really set
 	if c.NetworkZone != "" {
 		qv.Add("networkzone", c.NetworkZone)
+	} else {
+		qv.Add("networkzone", "default")
 	}
 	for _, t := range h.IncludeTechnologies {
 		qv.Add("include", t)
