@@ -258,7 +258,7 @@ var _ = Describe("dynatraceHook", func() {
 					"2": [{"name":"redis"}]
 				}`)
 
-				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet&networkzone=default",
 					api_header_check)
 			})
 
@@ -289,7 +289,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 					"2": [{"name":"redis"}]
 				}`)
 
-				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet&networkzone=default",
 					api_header_check)
 			})
 
@@ -318,7 +318,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 					"2": [{"name":"redis"}]
 				}`)
 
-				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet&networkzone=default",
 					api_header_check)
 			})
 
@@ -348,7 +348,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 					"2": [{"name":"redis"}]
 				}`)
 
-				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet&networkzone=default",
 					api_header_check)
 
 				os.Remove(filepath.Join(bpDir, "VERSION"))
@@ -380,7 +380,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 					"2": [{"name":"redis", "credentials":{"db_type":"redis", "instance_administration_api":{"deployment_id":"12345asdf", "instance_id":"12345asdf", "root":"https://doesnotexi.st"}}}]
 				}`)
 
-				httpmock.RegisterResponder("GET", "https://"+environmentID+".live.dynatrace.com/api/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
+				httpmock.RegisterResponder("GET", "https://"+environmentID+".live.dynatrace.com/api/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet&networkzone=default",
 					api_header_check)
 			})
 
@@ -413,7 +413,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				hook.MaxDownloadRetries = 1
 				attempt := 0
 
-				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet&networkzone=default",
 					func(req *http.Request) (*http.Response, error) {
 						if attempt += 1; attempt == 1 {
 							return httpmock.NewStringResponse(500, `{"error": "Server failure"}`), nil
@@ -467,7 +467,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 					"0": [{"name":"dynatrace","credentials":{"apitoken":"`+apiToken+`","environmentid":"`+environmentID+`","networkzone":"west-us"}}]
 				}`)
 
-				httpmock.RegisterResponder("GET", "https://"+environmentID+".live.dynatrace.com/api/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
+				httpmock.RegisterResponder("GET", "https://"+environmentID+".live.dynatrace.com/api/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet&networkzone=west-us",
 					api_header_check)
 			})
 
@@ -496,7 +496,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 					"0": [{"name":"dynatrace","credentials":{"environmentid":"`+environmentID+`","apitoken":"`+apiToken+`","skiperrors":"true"}}]
 				}`)
 
-				httpmock.RegisterResponder("GET", "https://"+environmentID+".live.dynatrace.com/api/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
+				httpmock.RegisterResponder("GET", "https://"+environmentID+".live.dynatrace.com/api/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet&networkzone=default",
 					httpmock.NewStringResponder(404, "echo agent not found"))
 			})
 
