@@ -417,9 +417,8 @@ func (h* Hook) updateAgentConfig(creds credentials, installDir , buildPackLangua
 	if err != nil {
 		h.Log.Error("Failed to fetch OneAgent config from API: %s", err)
 		return err
-	} else {
-		h.Log.Debug("Successfully fetched OneAgent config from API")
 	}
+	h.Log.Debug("Successfully fetched OneAgent config from API")
 
 	var jsonConfig properties
 	json.NewDecoder(resp.Body).Decode(&jsonConfig)
@@ -441,9 +440,8 @@ func (h* Hook) updateAgentConfig(creds credentials, installDir , buildPackLangua
 	if err != nil {
 		h.Log.Error("Failure while reading OneAgent config file %s: %s", agentConfigPath, err)
 		return err
-	} else {
-		h.Log.Debug("Successfully read OneAgent config from %s", agentConfigPath)
 	}
+	h.Log.Debug("Successfully read OneAgent config from %s", agentConfigPath)
 	defer agentConfigFile.Close()
 
 	configFromAgent := make(map[string]map[string]string)
@@ -509,9 +507,8 @@ func (h* Hook) updateAgentConfig(creds credentials, installDir , buildPackLangua
 	if err != nil {
 		h.Log.Error("Error opening OneAgent config file %s: %s", agentConfigPath, err)
 		return err
-	} else {
-		h.Log.Debug("Successfully opened OneAgent config file %s for writing", agentConfigPath)
 	}
+	h.Log.Debug("Successfully opened OneAgent config file %s for writing", agentConfigPath)
 	defer overwriteAgentConfigFile.Close()
 
 	// write merged data to ruxitagentproc.conf
