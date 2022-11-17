@@ -12,6 +12,14 @@ import (
 const dateFormat = "2006-01-02"
 const thirtyDays = time.Hour * 24 * 30
 
+const (
+	CFLINUXFS2              = "cflinuxfs2"
+	WINDOWS2016             = "windows2016"
+	ATTENTION_MSG           = "!! !!"
+	WARNING_MSG_CFLINUXFS2  = "This application is being deployed on cflinuxfs2 which is being deprecated in April, 2019.\nPlease migrate this application to cflinuxfs3.\nFor more information about changing the stack, see https://docs.cloudfoundry.org/devguide/deploy-apps/stacks.html"
+	WARNING_MSG_WINDOWS2016 = "This application is being deployed on the 'windows2016' stack which is deprecated.\nPlease restage this application to the 'windows' stack with '-s windows'.\nAny other applications deployed to the 'windows2016' stack should also be restaged to '-s windows'.\nFor more information, see https://docs.cloudfoundry.org/devguide/deploy-apps/windows-stacks.html"
+)
+
 type Dependency struct {
 	Name    string `yaml:"name"`
 	Version string `yaml:"version"`
@@ -150,18 +158,22 @@ func (m *Manifest) CheckBuildpackVersion(cacheDir string) {
 	return
 }
 
-func (m *Manifest) StoreBuildpackMetadata(cacheDir string) {
+func (m *Manifest) StoreBuildpackMetadata(cacheDir string) error {
 	version, err := m.Version()
 	if err != nil {
-		return
+		return err
 	}
 
 	md := BuildpackMetadata{Language: m.Language(), Version: version}
 
-	if exists, _ := FileExists(cacheDir); exists {
-		y := &YAML{}
-		_ = y.Write(filepath.Join(cacheDir, "BUILDPACK_METADATA"), &md)
+	if exists, err := FileExists(cacheDir); err != nil {
+		return err
+	} else if !exists {
+		return nil
 	}
+
+	y := &YAML{}
+	return y.Write(filepath.Join(cacheDir, "BUILDPACK_METADATA"), &md)
 }
 
 func (m *Manifest) Language() string {
@@ -179,6 +191,14 @@ func (m *Manifest) Version() (string, error) {
 
 func (m *Manifest) CheckStackSupport() error {
 	requiredStack := os.Getenv("CF_STACK")
+
+	if requiredStack == CFLINUXFS2 {
+		m.log.Warning("\n" + ATTENTION_MSG + "\n" + WARNING_MSG_CFLINUXFS2 + "\n" + ATTENTION_MSG)
+	}
+
+	if requiredStack == WINDOWS2016 {
+		m.log.Warning("\n" + ATTENTION_MSG + "\n" + WARNING_MSG_WINDOWS2016 + "\n" + ATTENTION_MSG)
+	}
 
 	if m.manifestSupportsStack(requiredStack) {
 		return nil
@@ -252,7 +272,7 @@ func fetchCachedBuildpackDependency(entry *ManifestEntry, outputFile, manifestRo
 }
 
 func deleteBadFile(entry *ManifestEntry, outputFile string) error {
-	if err := checkSha256(outputFile, entry.SHA256); err != nil {
+	if err := CheckSha256(outputFile, entry.SHA256); err != nil {
 		os.Remove(outputFile)
 		return err
 	}
@@ -319,7 +339,7 @@ func (m *Manifest) IsCached() bool {
 
 	isCached, err := FileExists(dependenciesDir)
 	if err != nil {
-		m.log.Warning("Error determining if buildpack is cached: %s", err.Error())
+		m.log.Warning("Error determining if buildpack is cached: %s", err)
 	}
 
 	return isCached
