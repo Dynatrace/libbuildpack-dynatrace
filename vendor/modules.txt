@@ -1,6 +1,8 @@
 # github.com/Masterminds/semver v1.4.2
+## explicit
 github.com/Masterminds/semver
 # github.com/blang/semver v3.5.1+incompatible
+## explicit
 github.com/blang/semver
 # github.com/cloudfoundry/libbuildpack v0.0.0-20181224210246-78d931650f60
 ## explicit
@@ -9,11 +11,14 @@ github.com/cloudfoundry/libbuildpack
 ## explicit
 github.com/golang/mock/gomock
 # github.com/hpcloud/tail v1.0.0
+## explicit
 github.com/hpcloud/tail
 github.com/hpcloud/tail/ratelimiter
 github.com/hpcloud/tail/util
 github.com/hpcloud/tail/watch
 github.com/hpcloud/tail/winfile
+# github.com/kr/pretty v0.3.1
+## explicit; go 1.12
 # github.com/onsi/ginkgo v1.7.0
 ## explicit
 github.com/onsi/ginkgo
@@ -49,12 +54,15 @@ github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
 # golang.org/x/net v0.0.0-20181220203305-927f97764cc3
+## explicit
 golang.org/x/net/html
 golang.org/x/net/html/atom
 golang.org/x/net/html/charset
 # golang.org/x/sys v0.0.0-20181221143128-b4a75ba826a6
+## explicit
 golang.org/x/sys/unix
 # golang.org/x/text v0.3.0
+## explicit
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
 golang.org/x/text/encoding/htmlindex
@@ -71,11 +79,14 @@ golang.org/x/text/language
 golang.org/x/text/runes
 golang.org/x/text/transform
 # gopkg.in/fsnotify.v1 v1.4.7
+## explicit
 gopkg.in/fsnotify.v1
 # gopkg.in/jarcoal/httpmock.v1 v1.0.0-20181117152235-275e9df93516
 ## explicit
 gopkg.in/jarcoal/httpmock.v1
 # gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7
+## explicit
 gopkg.in/tomb.v1
 # gopkg.in/yaml.v2 v2.2.2
+## explicit
 gopkg.in/yaml.v2
