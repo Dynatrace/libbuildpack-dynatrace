@@ -353,6 +353,7 @@ func (h *Hook) ensureApiURL(c *credentials) (string, error) {
 	apiURL := c.APIURL
 	if apiURL == "" {
 		apiURL = fmt.Sprintf("https://%s.live.dynatrace.com/api", c.EnvironmentID)
+		h.Log.Debug("No apiurl configured, assuming PaaS tenant and setting apiurl to %s", apiURL)
 	}
 
 	url, err := url.ParseRequestURI(apiURL)
