@@ -4,12 +4,13 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"github.com/Masterminds/semver"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/Masterminds/semver"
 )
 
 type Installer struct {
@@ -76,10 +77,21 @@ func (i *Installer) InstallDependency(dep Dependency, outputDir string) error {
 		return ExtractTarXz(tmpFile, outputDir)
 	}
 
-	return ExtractTarGz(tmpFile, outputDir)
+	if strings.HasSuffix(entry.URI, ".tar.gz") || strings.HasSuffix(entry.URI, ".tgz") {
+		return ExtractTarGz(tmpFile, outputDir)
+	}
+
+	basename := filepath.Base(entry.URI)
+	return CopyFile(tmpFile, filepath.Join(outputDir, basename))
 }
 
 func (i *Installer) warnNewerPatch(dep Dependency) error {
+
+	if strings.Contains(dep.Version, "preview") {
+		i.manifest.log.Warning("You are using the preview version %s of %s", dep.Version, dep.Name)
+		return nil
+	}
+
 	versions := i.manifest.AllDependencyVersions(dep.Name)
 
 	v, err := semver.NewVersion(dep.Version)

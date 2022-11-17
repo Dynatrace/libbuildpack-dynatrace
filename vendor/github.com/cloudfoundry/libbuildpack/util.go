@@ -10,13 +10,55 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
+func MoveDirectory(srcDir, destDir string) error {
+	destExists, _ := FileExists(destDir)
+	if !destExists {
+		return os.Rename(srcDir, destDir)
+	}
+
+	files, err := ioutil.ReadDir(srcDir)
+	if err != nil {
+		return err
+	}
+	for _, f := range files {
+		src := filepath.Join(srcDir, f.Name())
+		dest := filepath.Join(destDir, f.Name())
+
+		if exists, err := FileExists(dest); err != nil {
+			return err
+		} else if !exists {
+			if m := f.Mode(); m&os.ModeSymlink != 0 {
+				if err = moveSymlinks(src, dest); err != nil {
+					return err
+				}
+			}
+			if err = os.Rename(src, dest); err != nil {
+				return err
+			}
+		} else {
+			if f.IsDir() {
+				if err = MoveDirectory(src, dest); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
 
 // CopyDirectory copies srcDir to destDir
 func CopyDirectory(srcDir, destDir string) error {
@@ -35,12 +77,8 @@ func CopyDirectory(srcDir, destDir string) error {
 		dest := filepath.Join(destDir, f.Name())
 
 		if m := f.Mode(); m&os.ModeSymlink != 0 {
-			target, err := os.Readlink(src)
-			if err != nil {
-				return fmt.Errorf("Error while reading symlink '%s': %v", src, err)
-			}
-			if err := os.Symlink(target, dest); err != nil {
-				return fmt.Errorf("Error while creating '%s' as symlink to '%s': %v", dest, target, err)
+			if err = moveSymlinks(src, dest); err != nil {
+				return err
 			}
 		} else if f.IsDir() {
 			err = os.MkdirAll(dest, f.Mode())
@@ -65,6 +103,17 @@ func CopyDirectory(srcDir, destDir string) error {
 		}
 	}
 
+	return nil
+}
+
+func moveSymlinks(src, dest string) error {
+	target, err := os.Readlink(src)
+	if err != nil {
+		return fmt.Errorf("Error while reading symlink '%s': %v", src, err)
+	}
+	if err := os.Symlink(target, dest); err != nil {
+		return fmt.Errorf("Error while creating '%s' as symlink to '%s': %v", dest, target, err)
+	}
 	return nil
 }
 
@@ -187,6 +236,15 @@ func FileExists(file string) (bool, error) {
 	return true, nil
 }
 
+func RandString(n int) string {
+	letterRunes := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+	}
+	return string(b)
+}
+
 func extractTar(src io.Reader, destDir string) error {
 	tr := tar.NewReader(src)
 
@@ -202,7 +260,7 @@ func extractTar(src io.Reader, destDir string) error {
 			if err := os.MkdirAll(path, hdr.FileInfo().Mode()); err != nil {
 				return err
 			}
-		} else if fi.Mode()&os.ModeSymlink != 0 {
+		} else if hdr.Typeflag == tar.TypeSymlink {
 			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 				return err
 			}
@@ -229,6 +287,17 @@ func extractTar(src io.Reader, destDir string) error {
 			if err = os.Symlink(hdr.Linkname, path); err != nil {
 				return err
 			}
+		} else if hdr.Typeflag == tar.TypeLink {
+			originalPath := filepath.Join(destDir, cleanPath(hdr.Linkname))
+			file, err := os.Open(originalPath)
+			if err != nil {
+				return err
+			}
+
+			if err := writeToFile(file, path, hdr.FileInfo().Mode()); err != nil {
+				return err
+			}
+
 		} else {
 			if err := writeToFile(tr, path, hdr.FileInfo().Mode()); err != nil {
 				return err
@@ -260,7 +329,7 @@ func filterURI(rawURL string) (string, error) {
 	return safeURL, nil
 }
 
-func checkSha256(filePath, expectedSha256 string) error {
+func CheckSha256(filePath, expectedSha256 string) error {
 	content, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return err
