@@ -349,10 +349,10 @@ func (h *Hook) getDownloadURL(c *credentials) string {
 // ensureApiURL makes sure that a valid URL was provided via the cf service.
 // If the c.APIURL property is empty, we assume this is a PaaS setting and generate
 // a proper API URL for a PaaS tenant.
-func (h *Hook) ensureApiURL(c *credentials) (string, error) {
-	apiURL := c.APIURL
+func (h *Hook) ensureApiURL(creds *credentials) (string, error) {
+	apiURL := creds.APIURL
 	if apiURL == "" {
-		apiURL = fmt.Sprintf("https://%s.live.dynatrace.com/api", c.EnvironmentID)
+		apiURL = fmt.Sprintf("https://%s.live.dynatrace.com/api", creds.EnvironmentID)
 		h.Log.Debug("No apiurl configured, assuming PaaS tenant and setting apiurl to %s", apiURL)
 	} else {
 		h.Log.Debug("apiurl parameter configured is set to %s, no need to apply PaaS fallback", apiURL)
