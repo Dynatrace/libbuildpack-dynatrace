@@ -17,7 +17,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"gopkg.in/jarcoal/httpmock.v1"
+	"github.com/jarcoal/httpmock"
 )
 
 //go:generate mockgen -source=hook.go --destination=mocks_test.go --package=dynatrace_test
@@ -119,6 +119,22 @@ var _ = Describe("dynatraceHook", func() {
 			}`
 			err = ioutil.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/manifest.json"), []byte(manifestJson), 0664)
 			Expect(err).To(BeNil())
+
+			ruxitagentproc := `
+			[section1]
+			key1=val1
+			key2=val2
+
+			[section2]
+			key3=val3
+			key4=val4`
+
+			err = os.MkdirAll(filepath.Join(buildDir, "dynatrace/oneagent/agent/conf"), 0755)
+			Expect(err).To(BeNil())
+
+			err = ioutil.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/agent/conf/ruxitagentproc.conf"), []byte(ruxitagentproc), 0664)
+			Expect(err).To(BeNil())
+
 		}
 	})
 
@@ -251,6 +267,7 @@ var _ = Describe("dynatraceHook", func() {
 
 		Context("VCAP_SERVICES contains dynatrace service using apiurl", func() {
 			BeforeEach(func() {
+				os.Setenv("BP_DEBUG", "true")
 				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
 				os.Setenv("VCAP_SERVICES", `{
 					"0": [{"name":"mysql"}],
@@ -258,7 +275,10 @@ var _ = Describe("dynatraceHook", func() {
 					"2": [{"name":"redis"}]
 				}`)
 
-				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet&networkzone=default",
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
+					api_header_check)
+
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/processmoduleconfig",
 					api_header_check)
 			})
 
@@ -267,6 +287,84 @@ var _ = Describe("dynatraceHook", func() {
 
 				err = hook.AfterCompile(stager)
 				Expect(err).To(BeNil())
+
+				// Sets up profile.d
+				contents, err := ioutil.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", "dynatrace-env.sh"))
+				Expect(err).To(BeNil())
+
+				Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
+export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so
+export DT_LOGSTREAM=stdout
+export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"`))
+			})
+		})
+
+		Context("Agent config can't be fetched from the API", func() {
+			BeforeEach(func() {
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Setenv("VCAP_SERVICES", `{
+					"0": [{"name":"mysql"}],
+					"1": [{"name":"dynatrace","credentials":{"apiurl":"https://example.com","apitoken":"`+apiToken+`","environmentid":"`+environmentID+`"}}],
+					"2": [{"name":"redis"}]
+				}`)
+
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
+					api_header_check)
+
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/processmoduleconfig",
+					httpmock.NewStringResponder(404, "echo config not found"))
+			})
+
+			It("installs dynatrace and writes comment to uxitagentproc.conf", func() {
+				mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(runInstaller)
+
+				err = hook.AfterCompile(stager)
+				Expect(err).To(BeNil())
+
+				Expect(buffer.String()).To(ContainSubstring("Failed to fetch OneAgent config from API"))
+
+				// Check for comment in ruxitagentproc.conf
+				contents, err := ioutil.ReadFile(filepath.Join(buildDir, "dynatrace/oneagent/agent/conf/ruxitagentproc.conf"))
+				Expect(err).To(BeNil())
+
+				warn_string := "# Warning: Config fetched from the API was empty. This config only includes settings provided by the installer."
+				Expect(strings.Contains(string(contents), warn_string)).To(BeTrue())
+
+				// Sets up profile.d
+				contents, err = ioutil.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", "dynatrace-env.sh"))
+				Expect(err).To(BeNil())
+
+				Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
+export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so
+export DT_LOGSTREAM=stdout
+export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"`))
+			})
+		})
+
+		Context("Agent config can be fetched from the API", func() {
+			BeforeEach(func() {
+				os.Setenv("BP_DEBUG", "true")
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Setenv("VCAP_SERVICES", `{
+					"0": [{"name":"mysql"}],
+					"1": [{"name":"dynatrace","credentials":{"apiurl":"https://example.com","apitoken":"`+apiToken+`","environmentid":"`+environmentID+`"}}],
+					"2": [{"name":"redis"}]
+				}`)
+
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
+					api_header_check)
+
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/processmoduleconfig",
+					api_header_check)
+			})
+
+			It("installs dynatrace", func() {
+				mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(runInstaller)
+
+				err = hook.AfterCompile(stager)
+				Expect(err).To(BeNil())
+
+				Expect(buffer.String()).To(ContainSubstring("Successfully fetched OneAgent config from API"))
 
 				// Sets up profile.d
 				contents, err := ioutil.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", "dynatrace-env.sh"))
@@ -289,7 +387,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 					"2": [{"name":"redis"}]
 				}`)
 
-				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet&networkzone=default",
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
 					api_header_check)
 			})
 
@@ -318,7 +416,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 					"2": [{"name":"redis"}]
 				}`)
 
-				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet&networkzone=default",
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
 					api_header_check)
 			})
 
@@ -348,7 +446,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 					"2": [{"name":"redis"}]
 				}`)
 
-				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet&networkzone=default",
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
 					api_header_check)
 
 				os.Remove(filepath.Join(bpDir, "VERSION"))
@@ -380,7 +478,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 					"2": [{"name":"redis", "credentials":{"db_type":"redis", "instance_administration_api":{"deployment_id":"12345asdf", "instance_id":"12345asdf", "root":"https://doesnotexi.st"}}}]
 				}`)
 
-				httpmock.RegisterResponder("GET", "https://"+environmentID+".live.dynatrace.com/api/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet&networkzone=default",
+				httpmock.RegisterResponder("GET", "https://"+environmentID+".live.dynatrace.com/api/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
 					api_header_check)
 			})
 
@@ -413,7 +511,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				hook.MaxDownloadRetries = 1
 				attempt := 0
 
-				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet&networkzone=default",
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
 					func(req *http.Request) (*http.Response, error) {
 						if attempt += 1; attempt == 1 {
 							return httpmock.NewStringResponse(500, `{"error": "Server failure"}`), nil
@@ -467,7 +565,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 					"0": [{"name":"dynatrace","credentials":{"apitoken":"`+apiToken+`","environmentid":"`+environmentID+`","networkzone":"west-us"}}]
 				}`)
 
-				httpmock.RegisterResponder("GET", "https://"+environmentID+".live.dynatrace.com/api/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet&networkzone=west-us",
+				httpmock.RegisterResponder("GET", "https://"+environmentID+".live.dynatrace.com/api/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet&networkZone=west-us",
 					api_header_check)
 			})
 
@@ -496,7 +594,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 					"0": [{"name":"dynatrace","credentials":{"environmentid":"`+environmentID+`","apitoken":"`+apiToken+`","skiperrors":"true"}}]
 				}`)
 
-				httpmock.RegisterResponder("GET", "https://"+environmentID+".live.dynatrace.com/api/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet&networkzone=default",
+				httpmock.RegisterResponder("GET", "https://"+environmentID+".live.dynatrace.com/api/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
 					httpmock.NewStringResponder(404, "echo agent not found"))
 			})
 
