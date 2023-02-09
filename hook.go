@@ -428,6 +428,8 @@ func (h *Hook) updateAgentConfig(creds *credentials, installDir, buildPackLangua
 	}
 
 	// Fetch most recent OneAgent config from API, which we get back in JSON format
+	// According to the API spec it always returns at least some sort of Header Info.
+	// So, we do not need to handle the case that the request succeeds and the content is empty.
 	client := &http.Client{Timeout: 3 * time.Second}
 	apiURL, err := h.ensureApiURL(creds)
 	if err != nil {
@@ -442,11 +444,14 @@ func (h *Hook) updateAgentConfig(creds *credentials, installDir, buildPackLangua
 	client.Do(req)
 	resp, err := client.Do(req)
 
+	configComment := ""
 	configFromAPI := make(map[string]map[string]string)
 	if err != nil || resp.StatusCode != 200 {
-		h.Log.Warning("Failed to fetch OneAgent config from API")
+		h.Log.Warning("Failed to fetch updated OneAgent config from the API")
+		configComment = "# Warning: Failed to fetch updated OneAgent config from the API. This config only includes settings provided by the installer.\n"
 	} else {
-		h.Log.Debug("Successfully fetched OneAgent config from API")
+		h.Log.Debug("Successfully fetched updated OneAgent config from the API")
+		configComment = "# This config is a merge between the installer and the Cluster config\n"
 		var jsonConfig properties
 		json.NewDecoder(resp.Body).Decode(&jsonConfig)
 
@@ -538,11 +543,8 @@ func (h *Hook) updateAgentConfig(creds *credentials, installDir, buildPackLangua
 	h.Log.Debug("Successfully opened OneAgent config file %s for writing", agentConfigPath)
 	defer overwriteAgentConfigFile.Close()
 
-	// Add Info to ruxitagentproc.conf in case no values could be retrieved from the API
-	h.Log.Debug("Config fetched from the API was empty.")
-	if len(configFromAPI) == 0 {
-		fmt.Fprintf(overwriteAgentConfigFile, "# Warning: Config fetched from the API was empty. This config only includes settings provided by the installer.\n")
-	}
+	// Write additional comments to the config
+	fmt.Fprintf(overwriteAgentConfigFile, configComment)
 
 	// write merged data to ruxitagentproc.conf
 	for section := range configFromAgent {
