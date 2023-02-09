@@ -5,9 +5,9 @@ go 1.19
 require (
 	github.com/cloudfoundry/libbuildpack v0.0.0-20221115221325-f9d1b0cc562f
 	github.com/golang/mock v1.6.0
+	github.com/jarcoal/httpmock v1.3.0
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.24.1
-	gopkg.in/jarcoal/httpmock.v1 v1.0.0-20181117152235-275e9df93516
 )
 
 require (
