@@ -321,13 +321,13 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				err = hook.AfterCompile(stager)
 				Expect(err).To(BeNil())
 
-				Expect(buffer.String()).To(ContainSubstring("Failed to fetch OneAgent config from API"))
+				Expect(buffer.String()).To(ContainSubstring("Failed to fetch updated OneAgent config from the API"))
 
 				// Check for comment in ruxitagentproc.conf
 				contents, err := ioutil.ReadFile(filepath.Join(buildDir, "dynatrace/oneagent/agent/conf/ruxitagentproc.conf"))
 				Expect(err).To(BeNil())
 
-				warn_string := "# Warning: Config fetched from the API was empty. This config only includes settings provided by the installer."
+				warn_string := "# Warning: Failed to fetch updated OneAgent config from the API. This config only includes settings provided by the installer."
 				Expect(strings.Contains(string(contents), warn_string)).To(BeTrue())
 
 				// Sets up profile.d
@@ -364,10 +364,16 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				err = hook.AfterCompile(stager)
 				Expect(err).To(BeNil())
 
-				Expect(buffer.String()).To(ContainSubstring("Successfully fetched OneAgent config from API"))
+				Expect(buffer.String()).To(ContainSubstring("Successfully fetched updated OneAgent config from the API"))
+
+				// Check for comment in ruxitagentproc.conf
+				contents, err := ioutil.ReadFile(filepath.Join(buildDir, "dynatrace/oneagent/agent/conf/ruxitagentproc.conf"))
+				Expect(err).To(BeNil())
+				configComment := "# This config is a merge between the installer and the Cluster config"
+				Expect(strings.Contains(string(contents), configComment)).To(BeTrue())
 
 				// Sets up profile.d
-				contents, err := ioutil.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", "dynatrace-env.sh"))
+				contents, err = ioutil.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", "dynatrace-env.sh"))
 				Expect(err).To(BeNil())
 
 				Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
