@@ -435,7 +435,7 @@ func (h *Hook) updateAgentConfig(creds *credentials, installDir, buildPackLangua
 	if err != nil {
 		return err
 	}
-	agentConfigUrl := apiURL + "/v1/deployment/installer/agent/processmoduleconfig"
+	agentConfigUrl := apiURL + "/v1/deployment/installer/agent/fail/processmoduleconfig"
 
 	h.Log.Debug("Downloading updated OneAgent config from %s", agentConfigUrl)
 	req, _ := http.NewRequest("GET", agentConfigUrl, nil)
