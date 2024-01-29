@@ -33,6 +33,7 @@ type credentials struct {
 	APIURL            string
 	SkipErrors        bool
 	NetworkZone       string
+	EnableFIPS        bool
 }
 
 // Hook implements libbuildpack.Hook. It downloads and install the Dynatrace OneAgent.
@@ -188,6 +189,15 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 
 	}
 
+	if h.getCredentials().EnableFIPS {
+		h.Log.Debug("Removing file 'dt_fips_disabled.flag' to enable FIPS mode...")
+		flagFilePath := filepath.Join(stager.BuildDir(), installDir, "agent/dt_fips_disabled.flag")
+		if err := os.Remove(flagFilePath); err != nil {
+			h.Log.Error("Error during fips flag file deletion: %s", err)
+			return err
+		}
+	}
+
 	h.Log.Info("Dynatrace OneAgent injection is set up.")
 
 	return nil
@@ -231,6 +241,7 @@ func (h *Hook) getCredentials() *credentials {
 				CustomOneAgentURL: queryString("customoneagenturl"),
 				SkipErrors:        queryString("skiperrors") == "true",
 				NetworkZone:       queryString("networkzone"),
+				EnableFIPS:        queryString("enablefips") == "true",
 			}
 
 			if (creds.EnvironmentID != "" && creds.APIToken != "") || creds.CustomOneAgentURL != "" {
