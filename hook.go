@@ -241,6 +241,7 @@ func (h *Hook) getCredentials() *credentials {
 				CustomOneAgentURL: queryString("customoneagenturl"),
 				SkipErrors:        queryString("skiperrors") == "true",
 				NetworkZone:       queryString("networkzone"),
+				EnableFIPS:        true,
 			}
 
 			if (creds.EnvironmentID != "" && creds.APIToken != "") || creds.CustomOneAgentURL != "" {
