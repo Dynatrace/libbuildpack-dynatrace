@@ -189,10 +189,9 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 
 	}
 
-	h.Log.Info(fmt.Sprintf("Enable FIPS is: %+v", h.getCredentials()))
 	if h.getCredentials().EnableFIPS {
 		h.Log.Debug("Removing file 'dt_fips_disabled.flag' to enable FIPS mode...")
-		flagFilePath := filepath.Join(installDir, "agent/dt_fips_disabled.flag")
+		flagFilePath := filepath.Join(stager.BuildDir(), installDir, "agent/dt_fips_disabled.flag")
 		if err := os.Remove(flagFilePath); err != nil {
 			h.Log.Error("Error during fips flag file deletion: %s", err)
 			return err
