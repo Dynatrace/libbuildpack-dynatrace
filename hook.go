@@ -216,8 +216,8 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 func (h *Hook) getAppName() string {
 	// Represent the structure of the JSON object in VCAP_APPLICATION for parsing.
 
-	var application map[string][]struct {
-		Name        string                 `json:"name"`
+	var application struct {
+		Name	string  `json:"name"`
 	}
 
 	if err := json.Unmarshal([]byte(os.Getenv("VCAP_APPLICATION")), &application); err != nil {
