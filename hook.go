@@ -170,7 +170,7 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 	}
 
 	appName := h.getAppName()
-	if appName != nil {
+	if appName != "" {
 		h.Log.Debug("Setting DT_APPLICATIONID...")
 		extra += fmt.Sprintf("\nexport DT_APPLICATIONID=%s", appName)
 	}
@@ -209,7 +209,7 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 	return nil
 }
 
-// getAppName returns the application name from the environment, or nil if not found. The application JSON object
+// getAppName returns the application name from the environment, or "" if not found. The application JSON object
 // in the VCAP_APPLICATION environment variable is used.
 // see: https://docs.cloudfoundry.org/devguide/deploy-apps/environment-variable.html#VCAP-APPLICATION
 // see: https://docs.dynatrace.com/docs/platform-modules/applications-and-microservices/services/service-detection-and-naming/service-types#expand--web-application-id--3
@@ -222,7 +222,7 @@ func (h *Hook) getAppName() string {
 
 	if err := json.Unmarshal([]byte(os.Getenv("VCAP_APPLICATION")), &application); err != nil {
 		h.Log.Debug("Failed to unmarshal VCAP_APPLICATION: %s", err)
-		return nil
+		return ""
 	}
 	return application.Name
 }
