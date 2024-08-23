@@ -169,6 +169,12 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 		extra += "\nexport DT_LOGSTREAM=stdout"
 	}
 
+	appName := h.getAppName()
+	if appName != nil {
+		h.Log.Debug("Setting DT_APPLICATIONID...")
+		extra += fmt.Sprintf("\nexport DT_APPLICATIONID=%s", appName)
+	}
+
 	h.Log.Debug("Preparing custom properties...")
 	extra += fmt.Sprintf(
 		"\nexport DT_CUSTOM_PROP=\"${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=%s CloudFoundryBuildpackVersion=%s\"", lang, ver)
@@ -202,6 +208,25 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 
 	return nil
 }
+
+// getAppName returns the application name from the environment, or nil if not found. The application JSON object
+// in the VCAP_APPLICATION environment variable is used.
+// see: https://docs.cloudfoundry.org/devguide/deploy-apps/environment-variable.html#VCAP-APPLICATION
+// see: https://docs.dynatrace.com/docs/platform-modules/applications-and-microservices/services/service-detection-and-naming/service-types#expand--web-application-id--3
+func (h *Hook) getAppName() string {
+	// Represent the structure of the JSON object in VCAP_APPLICATION for parsing.
+
+	var application map[string][]struct {
+		Name        string                 `json:"name"`
+	}
+
+	if err := json.Unmarshal([]byte(os.Getenv("VCAP_APPLICATION")), &application); err != nil {
+		h.Log.Debug("Failed to unmarshal VCAP_APPLICATION: %s", err)
+		return nil
+	}
+	return application.Name
+}
+
 
 // getCredentials returns the configuration from the environment, or nil if not found. The credentials are represented
 // as a JSON object in the VCAP_SERVICES environment variable.
