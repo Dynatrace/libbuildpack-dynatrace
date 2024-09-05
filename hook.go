@@ -107,7 +107,7 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 	h.Log.Debug("Making %s executable...", installerFilePath)
 	os.Chmod(installerFilePath, 0755)
 
-	h.Log.BeginStep("Starting Dynatrace OneAgent installer")
+	/*h.Log.BeginStep("Starting Dynatrace OneAgent installer")
 
 	//if os.Getenv("BP_DEBUG") != "" {
 	err = h.Command.Execute("", os.Stdout, os.Stderr, installerFilePath, stager.BuildDir())
@@ -199,7 +199,7 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 		}
 	}
 
-	h.Log.Info("Dynatrace OneAgent injection is set up.")
+	h.Log.Info("Dynatrace OneAgent injection is set up.")*/
 
 	return nil
 }
