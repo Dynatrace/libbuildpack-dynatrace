@@ -339,6 +339,8 @@ func (h *Hook) getDownloadURL(c *credentials) string {
 		return ""
 	}
 
+	fmt.Println(runtime.GOOS)
+
 	if runtime.GOOS == "windows" {
 		u, err := url.ParseRequestURI(fmt.Sprintf("%s/v1/deployment/installer/agent/windows/defaukt/latest", apiURL))
 		if err != nil {
