@@ -12,7 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"slices"
+	"runtime"
 	"strings"
 	"time"
 
@@ -339,16 +339,16 @@ func (h *Hook) getDownloadURL(c *credentials) string {
 		return ""
 	}
 
-	osType := "unix"
-	installerType := "paas-sh"
+	if runtime.GOOS == "windows" {
+		u, err := url.ParseRequestURI(fmt.Sprintf("%s/v1/deployment/installer/agent/windows/defaukt/latest", apiURL))
+		if err != nil {
+			return ""
+		}
 
-	// use windows deployment for Hosted Web Core
-	if slices.Contains(h.IncludeTechnologies, "hwc") {
-		osType = "windows"
-		installerType = "default"
+		return u.String()
 	}
 
-	u, err := url.ParseRequestURI(fmt.Sprintf("%s/v1/deployment/installer/agent/%s/%s/latest", apiURL, osType, installerType))
+	u, err := url.ParseRequestURI(fmt.Sprintf("%s/v1/deployment/installer/agent/unix/paas-sh/latest", apiURL))
 	if err != nil {
 		return ""
 	}
