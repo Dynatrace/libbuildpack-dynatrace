@@ -90,7 +90,7 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 
 	// Download installer...
 
-	installerFilePath := filepath.Join(os.TempDir(), "paasInstaller.sh")
+	installerFilePath := filepath.Join(os.TempDir(), "paasInstaller.exe")
 	url := h.getDownloadURL(creds)
 
 	h.Log.Info("Downloading '%s' to '%s'", url, installerFilePath)
