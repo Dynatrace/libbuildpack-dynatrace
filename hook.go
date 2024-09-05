@@ -109,11 +109,11 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 
 	h.Log.BeginStep("Starting Dynatrace OneAgent installer")
 
-	if os.Getenv("BP_DEBUG") != "" {
-		err = h.Command.Execute("", os.Stdout, os.Stderr, installerFilePath, stager.BuildDir())
-	} else {
-		err = h.Command.Execute("", ioutil.Discard, ioutil.Discard, installerFilePath, stager.BuildDir())
-	}
+	//if os.Getenv("BP_DEBUG") != "" {
+	err = h.Command.Execute("", os.Stdout, os.Stderr, installerFilePath, stager.BuildDir())
+	//} else {
+	//	err = h.Command.Execute("", ioutil.Discard, ioutil.Discard, installerFilePath, stager.BuildDir())
+	//}
 	if err != nil {
 		return err
 	}
