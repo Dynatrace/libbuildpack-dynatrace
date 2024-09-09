@@ -1,6 +1,7 @@
 package dynatrace
 
 import (
+	"archive/zip"
 	"bufio"
 	"encoding/json"
 	"fmt"
@@ -88,13 +89,21 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 		ver = "unknown"
 	}
 
+	if runtime.GOOS == "windows" {
+		return h.downloadAndInstallWindows(creds, ver, lang, stager)
+	} else {
+		return h.downloadAndInstallUnix(creds, ver, lang, stager)
+	}
+}
+
+func (h *Hook) downloadAndInstallUnix(creds *credentials, ver string, lang string, stager *libbuildpack.Stager) error {
 	// Download installer...
 
-	installerFilePath := filepath.Join(os.TempDir(), "paasInstaller.exe")
-	url := h.getDownloadURL(creds)
+	installerFilePath := filepath.Join(os.TempDir(), "paasInstaller.sh")
+	url := h.getDownloadURL(creds, "unix", "paas-sh")
 
 	h.Log.Info("Downloading '%s' to '%s'", url, installerFilePath)
-	if err = h.download(url, installerFilePath, ver, lang, creds); err != nil {
+	if err := h.download(url, installerFilePath, ver, lang, creds); err != nil {
 		if creds.SkipErrors {
 			h.Log.Warning("Error during installer download, skipping installation")
 			return nil
@@ -107,13 +116,14 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 	h.Log.Debug("Making %s executable...", installerFilePath)
 	os.Chmod(installerFilePath, 0755)
 
-	/*h.Log.BeginStep("Starting Dynatrace OneAgent installer")
+	h.Log.BeginStep("Starting Dynatrace OneAgent installer")
 
-	//if os.Getenv("BP_DEBUG") != "" {
-	err = h.Command.Execute("", os.Stdout, os.Stderr, installerFilePath, stager.BuildDir())
-	//} else {
-	//	err = h.Command.Execute("", ioutil.Discard, ioutil.Discard, installerFilePath, stager.BuildDir())
-	//}
+	var err error = nil
+	if os.Getenv("BP_DEBUG") != "" {
+		err = h.Command.Execute("", os.Stdout, os.Stderr, installerFilePath, stager.BuildDir())
+	} else {
+		err = h.Command.Execute("", ioutil.Discard, ioutil.Discard, installerFilePath, stager.BuildDir())
+	}
 	if err != nil {
 		return err
 	}
@@ -199,7 +209,47 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 		}
 	}
 
-	h.Log.Info("Dynatrace OneAgent injection is set up.")*/
+	h.Log.Info("Dynatrace OneAgent injection is set up.")
+
+	return nil
+}
+
+func (h *Hook) downloadAndInstallWindows(creds *credentials, ver string, lang string, stager *libbuildpack.Stager) error {
+	installerFilePath := filepath.Join(os.TempDir(), "paasInstaller.zip")
+	url := h.getDownloadURL(creds, "windows", "paas")
+
+	h.Log.Info("Downloading '%s' to '%s'", url, installerFilePath)
+	if err := h.download(url, installerFilePath, ver, lang, creds); err != nil {
+		if creds.SkipErrors {
+			h.Log.Warning("Error during installer download, skipping installation")
+			return nil
+		}
+		return err
+	}
+
+	h.Log.Info("Unzipping archive '%s' to '%s'", installerFilePath, stager.BuildDir())
+	if err := h.unzipArchive(installerFilePath, stager.BuildDir()); err != nil {
+		h.Log.Error("Error during unzipping installer archive")
+		return err
+	}
+
+	agentLibPath, err := h.findAgentPath(stager.BuildDir())
+	if err != nil {
+		h.Log.Error("Manifest handling failed!")
+		return err
+	}
+
+	agentBuilderLibPath := filepath.Join(stager.BuildDir(), agentLibPath)
+
+	if _, err = os.Stat(agentBuilderLibPath); os.IsNotExist(err) {
+		h.Log.Error("Agent library (%s) not found!", agentBuilderLibPath)
+		return err
+	}
+
+	h.Log.BeginStep("Setting up Dynatrace OneAgent injection...")
+	//h.Log.Debug("Copy %s to %s", dynatraceEnvName, dynatraceEnvPath)
+
+	h.Log.Info("Dynatrace OneAgent injection is set up.")
 
 	return nil
 }
@@ -329,7 +379,7 @@ func (h *Hook) download(url, filePath string, buildPackVersion string, language 
 	}
 }
 
-func (h *Hook) getDownloadURL(c *credentials) string {
+func (h *Hook) getDownloadURL(c *credentials, osType string, installerType string) string {
 	if c.CustomOneAgentURL != "" {
 		return c.CustomOneAgentURL
 	}
@@ -339,16 +389,7 @@ func (h *Hook) getDownloadURL(c *credentials) string {
 		return ""
 	}
 
-	if runtime.GOOS == "windows" {
-		u, err := url.ParseRequestURI(fmt.Sprintf("%s/v1/deployment/installer/agent/windows/default/latest", apiURL))
-		if err != nil {
-			return ""
-		}
-
-		return u.String()
-	}
-
-	u, err := url.ParseRequestURI(fmt.Sprintf("%s/v1/deployment/installer/agent/unix/paas-sh/latest", apiURL))
+	u, err := url.ParseRequestURI(fmt.Sprintf("%s/v1/deployment/installer/agent/%s/%s/latest", apiURL, osType, installerType))
 	if err != nil {
 		return ""
 	}
@@ -405,7 +446,11 @@ func (h *Hook) findAgentPath(installDir string) (string, error) {
 		Technologies Technologies `json:"technologies"`
 	}
 
-	fallbackPath := filepath.Join("agent", "lib64", "liboneagentproc.so")
+	libraryFilename := "liboneagentproc.so"
+	if runtime.GOOS == "windows" {
+		libraryFilename = "oneagentproc.dll"
+	}
+	fallbackPath := filepath.Join("agent", "lib64", libraryFilename)
 
 	manifestPath := filepath.Join(installDir, "manifest.json")
 	if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
@@ -421,7 +466,12 @@ func (h *Hook) findAgentPath(installDir string) (string, error) {
 		return "", err
 	}
 
-	for _, binary := range manifest.Technologies["process"]["linux-x86-64"] {
+	platformName := "linux-x86-64"
+	if runtime.GOOS == "windows" {
+		platformName = "windows-x86-64"
+	}
+
+	for _, binary := range manifest.Technologies["process"][platformName] {
 		if binary.BinaryType == "primary" {
 			return binary.Path, nil
 		}
@@ -579,6 +629,66 @@ func (h *Hook) updateAgentConfig(creds *credentials, installDir, buildPackLangua
 	}
 
 	h.Log.Debug("Finished writing updated OneAgent config back to %s", agentConfigPath)
+
+	return nil
+}
+
+func (h *Hook) unzipArchive(src, dest string) error {
+	r, err := zip.OpenReader(src)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := r.Close(); err != nil {
+			panic(err)
+		}
+	}()
+
+	extractAndWriteFile := func(f *zip.File) error {
+		rc, err := f.Open()
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err := rc.Close(); err != nil {
+				panic(err)
+			}
+		}()
+
+		path := filepath.Join(dest, f.Name)
+
+		if !strings.HasPrefix(path, filepath.Clean(dest)+string(os.PathSeparator)) {
+			return fmt.Errorf("illegal file path: %s", path)
+		}
+
+		if f.FileInfo().IsDir() {
+			os.MkdirAll(path, f.Mode())
+		} else {
+			os.MkdirAll(filepath.Dir(path), f.Mode())
+			f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+			if err != nil {
+				return err
+			}
+			defer func() {
+				if err := f.Close(); err != nil {
+					panic(err)
+				}
+			}()
+
+			_, err = io.Copy(f, rc)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	for _, f := range r.File {
+		err := extractAndWriteFile(f)
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
