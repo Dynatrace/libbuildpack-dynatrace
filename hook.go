@@ -247,7 +247,63 @@ func (h *Hook) downloadAndInstallWindows(creds *credentials, ver string, lang st
 	}
 
 	h.Log.BeginStep("Setting up Dynatrace OneAgent injection...")
-	//h.Log.Debug("Copy %s to %s", dynatraceEnvName, dynatraceEnvPath)
+
+	dynatraceEnvPath := filepath.Join(stager.DepDir(), "profile.d", "dynatrace-env.cmd")
+	h.Log.Debug("Creating %s...", dynatraceEnvPath)
+	f, err := os.OpenFile(dynatraceEnvPath, os.O_CREATE|os.O_WRONLY, 0)
+	if err != nil {
+		return err
+	}
+
+	defer f.Close()
+
+	extra := ""
+
+	h.Log.Debug("Setting AppInit_DLLs...")
+	extra += fmt.Sprintf("Set-ItemProperty -Path \"HKLM:\\\\SOFTWARE\\\\Microsoft\\\\Windows NT\\\\CurrentVersion\\\\Windows\" -Name \"AppInit_DLLs\" -Value %s", agentBuilderLibPath)
+
+	// if creds.NetworkZone != "" {
+	// 	h.Log.Debug("Setting DT_NETWORK_ZONE...")
+	// 	extra += fmt.Sprintf("\nexport DT_NETWORK_ZONE=${DT_NETWORK_ZONE:-%s}", creds.NetworkZone)
+	// }
+
+	// // By default, OneAgent logs are printed to stderr. If the customer doesn't override this behavior through an
+	// // environment variable, then we change the default output to stdout.
+	// if os.Getenv("DT_LOGSTREAM") == "" {
+	// 	h.Log.Debug("Setting DT_LOGSTREAM to stdout...")
+	// 	extra += "\nexport DT_LOGSTREAM=stdout"
+	// }
+
+	// h.Log.Debug("Preparing custom properties...")
+	// extra += fmt.Sprintf(
+	// 	"\nexport DT_CUSTOM_PROP=\"${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=%s CloudFoundryBuildpackVersion=%s\"", lang, ver)
+
+	if _, err = f.WriteString(extra); err != nil {
+		return err
+	}
+
+	h.Log.Debug("Fetching updated OneAgent configuration from tenant... ")
+	configDir := filepath.Join(stager.BuildDir(), installDir)
+	if err := h.updateAgentConfig(creds, configDir, lang, ver); err != nil {
+		if creds.SkipErrors {
+			h.Log.Warning("Error during agent config update, skipping it")
+			return nil
+		}
+		h.Log.Error("Error during agent config update: %s", err)
+		return err
+
+	}
+
+	if h.getCredentials().EnableFIPS {
+		h.Log.Debug("Removing file 'dt_fips_disabled.flag' to enable FIPS mode...")
+		flagFilePath := filepath.Join(stager.BuildDir(), installDir, "agent/dt_fips_disabled.flag")
+		if err := os.Remove(flagFilePath); err != nil {
+			h.Log.Error("Error during fips flag file deletion: %s", err)
+			return err
+		}
+	}
+
+	h.Log.Info("Dynatrace OneAgent injection is set up.")
 
 	h.Log.Info("Dynatrace OneAgent injection is set up.")
 
