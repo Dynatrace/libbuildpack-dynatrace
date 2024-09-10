@@ -189,8 +189,7 @@ func (h *Hook) downloadAndInstallUnix(creds *credentials, ver string, lang strin
 	}
 
 	h.Log.Debug("Fetching updated OneAgent configuration from tenant... ")
-	configDir := filepath.Join(stager.BuildDir(), installDir)
-	if err := h.updateAgentConfig(creds, configDir, lang, ver); err != nil {
+	if err := h.updateAgentConfig(creds, stager.BuildDir(), lang, ver); err != nil {
 		if creds.SkipErrors {
 			h.Log.Warning("Error during agent config update, skipping it")
 			return nil
@@ -202,7 +201,7 @@ func (h *Hook) downloadAndInstallUnix(creds *credentials, ver string, lang strin
 
 	if h.getCredentials().EnableFIPS {
 		h.Log.Debug("Removing file 'dt_fips_disabled.flag' to enable FIPS mode...")
-		flagFilePath := filepath.Join(stager.BuildDir(), installDir, "agent/dt_fips_disabled.flag")
+		flagFilePath := filepath.Join(stager.BuildDir(), "agent/dt_fips_disabled.flag")
 		if err := os.Remove(flagFilePath); err != nil {
 			h.Log.Error("Error during fips flag file deletion: %s", err)
 			return err
@@ -260,7 +259,9 @@ func (h *Hook) downloadAndInstallWindows(creds *credentials, ver string, lang st
 	extra := ""
 
 	h.Log.Debug("Setting AppInit_DLLs...")
-	extra += fmt.Sprintf("Set-ItemProperty -Path \"HKLM:\\\\SOFTWARE\\\\Microsoft\\\\Windows NT\\\\CurrentVersion\\\\Windows\" -Name \"AppInit_DLLs\" -Value %s", agentBuilderLibPath)
+	extra += fmt.Sprintf("reg add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Windows\" /t REG_SZ \"AppInit_DLLs\" /v %s", agentBuilderLibPath)
+	extra += "\nreg add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Windows\" /t REG_WORD \"LoadAppInit_DLLs\" /v 1"
+	extra += "\nreg add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Windows\" /t REG_WORD \"RequireSignedAppInit_DLLs\" /v 0"
 
 	// if creds.NetworkZone != "" {
 	// 	h.Log.Debug("Setting DT_NETWORK_ZONE...")
@@ -283,8 +284,7 @@ func (h *Hook) downloadAndInstallWindows(creds *credentials, ver string, lang st
 	}
 
 	h.Log.Debug("Fetching updated OneAgent configuration from tenant... ")
-	configDir := filepath.Join(stager.BuildDir(), installDir)
-	if err := h.updateAgentConfig(creds, configDir, lang, ver); err != nil {
+	if err := h.updateAgentConfig(creds, stager.BuildDir(), lang, ver); err != nil {
 		if creds.SkipErrors {
 			h.Log.Warning("Error during agent config update, skipping it")
 			return nil
@@ -296,14 +296,12 @@ func (h *Hook) downloadAndInstallWindows(creds *credentials, ver string, lang st
 
 	if h.getCredentials().EnableFIPS {
 		h.Log.Debug("Removing file 'dt_fips_disabled.flag' to enable FIPS mode...")
-		flagFilePath := filepath.Join(stager.BuildDir(), installDir, "agent/dt_fips_disabled.flag")
+		flagFilePath := filepath.Join(stager.BuildDir(), stager.BuildDir(), "agent/dt_fips_disabled.flag")
 		if err := os.Remove(flagFilePath); err != nil {
 			h.Log.Error("Error during fips flag file deletion: %s", err)
 			return err
 		}
 	}
-
-	h.Log.Info("Dynatrace OneAgent injection is set up.")
 
 	h.Log.Info("Dynatrace OneAgent injection is set up.")
 
