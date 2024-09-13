@@ -252,6 +252,7 @@ func (h *Hook) downloadAndInstallWindows(creds *credentials, ver string, lang st
 	h.Log.Debug("Creating %s...", dynatraceEnvPath)
 	f, err := os.OpenFile(dynatraceEnvPath, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
+		h.Log.Error("Cannot create dynatrace-env.cmd!")
 		return err
 	}
 
