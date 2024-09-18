@@ -265,9 +265,9 @@ func (h *Hook) downloadAndInstallWindows(creds *credentials, ver string, lang st
 	extra := ""
 
 	h.Log.Debug("Setting AppInit_DLLs...")
-	extra += fmt.Sprintf("reg add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Windows\" /t REG_SZ /v \"AppInit_DLLs\" /d %s /f", agentBuilderLibPath)
-	extra += "\nreg add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Windows\" /t REG_DWORD /v \"LoadAppInit_DLLs\" /d 1 /f"
-	extra += "\nreg add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Windows\" /t REG_DWORD /v \"RequireSignedAppInit_DLLs\" /d 0 /f"
+	extra += fmt.Sprintf("reg add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Windows\" /t REG_SZ /v \"AppInit_DLLs\" /d \"%s\" /f", agentBuilderLibPath)
+	extra += "\nreg add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Windows\" /t REG_DWORD /v \"LoadAppInit_DLLs\" /d \"1\" /f"
+	extra += "\nreg add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Windows\" /t REG_DWORD /v \"RequireSignedAppInit_DLLs\" /d \"0\" /f"
 
 	fmt.Printf("CMD: %s\n", extra)
 
