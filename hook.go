@@ -310,7 +310,7 @@ func (h *Hook) downloadAndInstallWindows(creds *credentials, ver string, lang st
 	}
 
 	h.Log.Info("Dynatrace OneAgent injection is set up.")
-	// 1
+	// 2
 	return nil
 }
 
