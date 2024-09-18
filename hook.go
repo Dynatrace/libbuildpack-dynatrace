@@ -268,6 +268,7 @@ func (h *Hook) downloadAndInstallWindows(creds *credentials, ver string, lang st
 	extra += fmt.Sprintf("reg add \"HKLM\\SOFTWARE\\Wow6432Node\\Microsoft\\Windows NT\\CurrentVersion\\Windows\" /t REG_SZ /v \"AppInit_DLLs\" /d %s /f", agentBuilderLibPath)
 	extra += "\nreg add \"HKLM\\SOFTWARE\\Microsoft\\Wow6432Node\\Windows NT\\CurrentVersion\\Windows\" /t REG_DWORD /v \"LoadAppInit_DLLs\" /d 1 /f"
 	extra += "\nreg add \"HKLM\\SOFTWARE\\Microsoft\\Wow6432Node\\Windows NT\\CurrentVersion\\Windows\" /t REG_DWORD /v \"RequireSignedAppInit_DLLs\" /d 0 /f"
+	extra += "echo WORKING"
 
 	// if creds.NetworkZone != "" {
 	// 	h.Log.Debug("Setting DT_NETWORK_ZONE...")
