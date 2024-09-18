@@ -238,6 +238,9 @@ func (h *Hook) downloadAndInstallWindows(creds *credentials, ver string, lang st
 		return err
 	}
 
+	agentLibPath = strings.ReplaceAll(agentLibPath, "/", "\\")
+	fmt.Printf("Buildir: %s Lib path: %s", stager.BuildDir(), agentLibPath)
+
 	agentBuilderLibPath := filepath.Join(stager.BuildDir(), agentLibPath)
 
 	if _, err = os.Stat(agentBuilderLibPath); os.IsNotExist(err) {
@@ -269,7 +272,7 @@ func (h *Hook) downloadAndInstallWindows(creds *credentials, ver string, lang st
 	extra += "\nreg add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Windows\" /t REG_DWORD /v \"LoadAppInit_DLLs\" /d \"1\" /f"
 	extra += "\nreg add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Windows\" /t REG_DWORD /v \"RequireSignedAppInit_DLLs\" /d \"0\" /f"
 
-	fmt.Printf("CMD: %s\n", extra)
+	fmt.Println(extra)
 
 	// if creds.NetworkZone != "" {
 	// 	h.Log.Debug("Setting DT_NETWORK_ZONE...")
