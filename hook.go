@@ -247,7 +247,11 @@ func (h *Hook) downloadAndInstallWindows(creds *credentials, ver string, lang st
 
 	h.Log.BeginStep("Setting up Dynatrace OneAgent injection...")
 
-	os.MkdirAll(filepath.Join(stager.DepDir(), "profile.d"), os.ModePerm)
+	err = os.MkdirAll(filepath.Join(stager.DepDir(), "profile.d"), os.ModePerm)
+	if err != nil {
+		return err
+	}
+
 	dynatraceEnvPath := filepath.Join(stager.DepDir(), "profile.d", "dynatrace-env.cmd")
 	h.Log.Debug("Creating %s...", dynatraceEnvPath)
 	f, err := os.OpenFile(dynatraceEnvPath, os.O_CREATE|os.O_WRONLY, 0644)
