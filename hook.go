@@ -267,12 +267,15 @@ func (h *Hook) downloadAndInstallWindows(creds *credentials, ver string, lang st
 
 	extra := ""
 
-	h.Log.Debug("Setting AppInit_DLLs...")
-	extra += fmt.Sprintf("reg add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Windows\" /t REG_SZ /v \"AppInit_DLLs\" /d \"%s\" /f", agentBuilderLibPath)
-	extra += "\nreg add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Windows\" /t REG_DWORD /v \"LoadAppInit_DLLs\" /d \"1\" /f"
-	extra += "\nreg add \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Windows\" /t REG_DWORD /v \"RequireSignedAppInit_DLLs\" /d \"0\" /f"
+	extra += "set COR_ENABLE_PROFILING=1\n"
+	extra += "set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}\n"
+	extra += "set DT_AGENTACTIVE=true\n"
+	extra += fmt.Sprintf("set COR_PROFILER_PATH_32=%s\n", agentLibPath)
+	extra += fmt.Sprintf("set COR_PROFILER_PATH_64=%s\n", agentLibPath)
 
-	fmt.Println(extra)
+	if creds.NetworkZone != "" {
+		extra += "set DT_NETWORK_ZONE=" + creds.NetworkZone
+	}
 
 	// if creds.NetworkZone != "" {
 	// 	h.Log.Debug("Setting DT_NETWORK_ZONE...")
