@@ -277,6 +277,8 @@ func (h *Hook) downloadAndInstallWindows(creds *credentials, ver string, lang st
 		extra += "set DT_NETWORK_ZONE=" + creds.NetworkZone
 	}
 
+	extra += "echo done\n"
+
 	// if creds.NetworkZone != "" {
 	// 	h.Log.Debug("Setting DT_NETWORK_ZONE...")
 	// 	extra += fmt.Sprintf("\nexport DT_NETWORK_ZONE=${DT_NETWORK_ZONE:-%s}", creds.NetworkZone)
