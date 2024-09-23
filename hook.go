@@ -277,7 +277,7 @@ func (h *Hook) downloadAndInstallWindows(creds *credentials, ver string, lang st
 		extra += "set DT_NETWORK_ZONE=" + creds.NetworkZone
 	}
 
-	extra += "echo done\n"
+	extra += "foo bar does not work\n"
 
 	// if creds.NetworkZone != "" {
 	// 	h.Log.Debug("Setting DT_NETWORK_ZONE...")
