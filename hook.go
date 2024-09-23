@@ -270,6 +270,8 @@ func (h *Hook) downloadAndInstallWindows(creds *credentials, ver string, lang st
 	extra += "set COR_ENABLE_PROFILING=1\n"
 	extra += "set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}\n"
 	extra += "set DT_AGENTACTIVE=true\n"
+	extra += "set DT_LOGLEVEL=DEBUG\n"
+	extra += "set DT_LOGLEVELCON=INFO\n"
 	extra += fmt.Sprintf("set COR_PROFILER_PATH_32=%s\n", agentLibPath)
 	extra += fmt.Sprintf("set COR_PROFILER_PATH_64=%s\n", agentLibPath)
 
