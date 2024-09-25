@@ -272,8 +272,8 @@ func (h *Hook) downloadAndInstallWindows(creds *credentials, ver string, lang st
 	extra += "set DT_AGENTACTIVE=true\n"
 	extra += "set DT_LOGLEVEL=DEBUG\n"
 	extra += "set DT_LOGLEVELCON=DEBUG\n"
-	extra += fmt.Sprintf("set COR_PROFILER_PATH_32=%s\n", agentLibPath)
-	extra += fmt.Sprintf("set COR_PROFILER_PATH_64=%s\n", agentLibPath)
+	extra += fmt.Sprintf("set COR_PROFILER_PATH_32=%s\n", "agent\\lib\\oneagentloader.dll")
+	extra += fmt.Sprintf("set COR_PROFILER_PATH_64=%s\n", "agent\\lib64\\oneagentloader.dll")
 
 	if creds.NetworkZone != "" {
 		extra += "set DT_NETWORK_ZONE=" + creds.NetworkZone
