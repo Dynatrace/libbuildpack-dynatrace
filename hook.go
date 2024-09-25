@@ -271,15 +271,13 @@ func (h *Hook) downloadAndInstallWindows(creds *credentials, ver string, lang st
 	extra += "set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}\n"
 	extra += "set DT_AGENTACTIVE=true\n"
 	extra += "set DT_LOGLEVEL=DEBUG\n"
-	extra += "set DT_LOGLEVELCON=INFO\n"
+	extra += "set DT_LOGLEVELCON=DEBUG\n"
 	extra += fmt.Sprintf("set COR_PROFILER_PATH_32=%s\n", agentLibPath)
 	extra += fmt.Sprintf("set COR_PROFILER_PATH_64=%s\n", agentLibPath)
 
 	if creds.NetworkZone != "" {
 		extra += "set DT_NETWORK_ZONE=" + creds.NetworkZone
 	}
-
-	extra += "foo bar does not work\n"
 
 	// if creds.NetworkZone != "" {
 	// 	h.Log.Debug("Setting DT_NETWORK_ZONE...")
