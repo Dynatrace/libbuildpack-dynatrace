@@ -118,7 +118,7 @@ func (h *Hook) downloadAndInstallUnix(creds *credentials, ver string, lang strin
 
 	h.Log.BeginStep("Starting Dynatrace OneAgent installer")
 
-	var err error = nil
+	var err error
 	if os.Getenv("BP_DEBUG") != "" {
 		err = h.Command.Execute("", os.Stdout, os.Stderr, installerFilePath, stager.BuildDir())
 	} else {
