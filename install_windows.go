@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/cloudfoundry/libbuildpack"
@@ -39,26 +40,41 @@ func (h *Hook) downloadAndInstall(creds *credentials, ver string, lang string, i
 
 	// Post-installation setup...
 
-	dynatraceEnvName := "dynatrace-env.cmd"
-	dynatraceEnvPath := filepath.Join(stager.DepDir(), "profile.d", dynatraceEnvName)
 	agentLibPath, err := h.findAgentPath(filepath.Join(stager.BuildDir(), installDir), "oneagentproc.dll", "windows-x86-64")
 	if err != nil {
 		h.Log.Error("Manifest handling failed!")
 		return err
 	}
 
-	// windows paths contain "\" instead of "/", so we need do replace them
+	// a windows path contains "\" instead of "/", so we need do replace them here
 	agentLibPath = strings.ReplaceAll(agentLibPath, "/", "\\")
-	agentBuilderLibPath := filepath.Join(stager.BuildDir(), installDir, agentLibPath)
 
+	agentBuilderLibPath := filepath.Join(stager.BuildDir(), installDir, agentLibPath)
 	if _, err = os.Stat(agentBuilderLibPath); os.IsNotExist(err) {
 		h.Log.Error("Agent library (%s) not found!", agentBuilderLibPath)
 		return err
 	}
 
 	h.Log.BeginStep("Setting up Dynatrace OneAgent injection...")
+	if slices.Contains(h.IncludeTechnologies, "dotnet") {
+		err = h.setUpDotNetCorProfilerInjection(creds, ver, lang, agentBuilderLibPath, stager)
+	} else {
+		h.Log.Warning("No injection method available for technology stack")
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (h *Hook) setUpDotNetCorProfilerInjection(creds *credentials, ver string, lang string, agentBuilderLibPath string, stager *libbuildpack.Stager) error {
+	dynatraceEnvName := "dynatrace-env.cmd"
+	dynatraceEnvPath := filepath.Join(stager.DepDir(), "profile.d", dynatraceEnvName)
+
 	h.Log.Debug("Copy %s to %s", dynatraceEnvName, dynatraceEnvPath)
-	err = os.MkdirAll(filepath.Join(stager.DepDir(), "profile.d"), os.ModePerm)
+	err := os.MkdirAll(filepath.Join(stager.DepDir(), "profile.d"), os.ModePerm)
 	if err != nil {
 		return err
 	}
