@@ -103,7 +103,8 @@ func (h *Hook) downloadAndInstallUnix(creds *credentials, ver string, lang strin
 	url := h.getDownloadURL(creds, "unix", "paas-sh")
 
 	h.Log.Info("Downloading '%s' to '%s'", url, installerFilePath)
-	if err := h.download(url, installerFilePath, ver, lang, creds); err != nil {
+	err := h.download(url, installerFilePath, ver, lang, creds)
+	if err != nil {
 		if creds.SkipErrors {
 			h.Log.Warning("Error during installer download, skipping installation")
 			return nil
@@ -118,7 +119,6 @@ func (h *Hook) downloadAndInstallUnix(creds *credentials, ver string, lang strin
 
 	h.Log.BeginStep("Starting Dynatrace OneAgent installer")
 
-	var err error
 	if os.Getenv("BP_DEBUG") != "" {
 		err = h.Command.Execute("", os.Stdout, os.Stderr, installerFilePath, stager.BuildDir())
 	} else {
