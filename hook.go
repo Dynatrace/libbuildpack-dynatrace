@@ -202,7 +202,7 @@ func (h *Hook) downloadAndInstallUnix(creds *credentials, ver string, lang strin
 
 	if h.getCredentials().EnableFIPS {
 		h.Log.Debug("Removing file 'dt_fips_disabled.flag' to enable FIPS mode...")
-		flagFilePath := filepath.Join(stager.BuildDir(), "agent/dt_fips_disabled.flag")
+		flagFilePath := filepath.Join(stager.BuildDir(), installDir, "agent/dt_fips_disabled.flag")
 		if err := os.Remove(flagFilePath); err != nil {
 			h.Log.Error("Error during fips flag file deletion: %s", err)
 			return err
