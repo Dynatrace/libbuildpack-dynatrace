@@ -97,8 +97,6 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 }
 
 func (h *Hook) downloadAndInstallUnix(creds *credentials, ver string, lang string, stager *libbuildpack.Stager) error {
-	// Download installer...
-
 	installerFilePath := filepath.Join(os.TempDir(), "paasInstaller.sh")
 	url := h.getDownloadURL(creds, "unix", "paas-sh")
 
@@ -135,7 +133,7 @@ func (h *Hook) downloadAndInstallUnix(creds *credentials, ver string, lang strin
 	dynatraceEnvName := "dynatrace-env.sh"
 	installDir := filepath.Join("dynatrace", "oneagent")
 	dynatraceEnvPath := filepath.Join(stager.DepDir(), "profile.d", dynatraceEnvName)
-	agentLibPath, err := h.findAgentPath(filepath.Join(stager.BuildDir(), installDir))
+	agentLibPath, err := h.findAgentPath(filepath.Join(stager.BuildDir(), installDir), "liboneagentproc.so", "linux-x86-64")
 	if err != nil {
 		h.Log.Error("Manifest handling failed!")
 		return err
@@ -227,22 +225,32 @@ func (h *Hook) downloadAndInstallWindows(creds *credentials, ver string, lang st
 		return err
 	}
 
-	h.Log.Info("Unzipping archive '%s' to '%s'", installerFilePath, stager.BuildDir())
-	if err := h.unzipArchive(installerFilePath, stager.BuildDir()); err != nil {
-		h.Log.Error("Error during unzipping installer archive")
+	// Do manual installation...
+
+	h.Log.BeginStep("Starting Dynatrace OneAgent installation")
+
+	installDir := filepath.Join("dynatrace", "oneagent")
+	h.Log.Info("Unzipping archive '%s' to '%s'", installerFilePath, filepath.Join(stager.BuildDir(), installDir))
+	if err := h.unzipArchive(installerFilePath, filepath.Join(stager.BuildDir(), installDir)); err != nil {
+		h.Log.Error("Error during unzipping paas archive")
 		return err
 	}
 
-	agentLibPath, err := h.findAgentPath(stager.BuildDir())
+	h.Log.Info("Dynatrace OneAgent installed.")
+
+	// Post-installation setup...
+
+	dynatraceEnvName := "dynatrace-env.cmd"
+	dynatraceEnvPath := filepath.Join(stager.DepDir(), "profile.d", dynatraceEnvName)
+	agentLibPath, err := h.findAgentPath(filepath.Join(stager.BuildDir(), installDir), "oneagentproc.dll", "windows-x86-64")
 	if err != nil {
 		h.Log.Error("Manifest handling failed!")
 		return err
 	}
 
+	// windows paths contain "\" instead of "/", so we need do replace them
 	agentLibPath = strings.ReplaceAll(agentLibPath, "/", "\\")
-	fmt.Printf("Buildir: %s Lib path: %s", stager.BuildDir(), agentLibPath)
-
-	agentBuilderLibPath := filepath.Join(stager.BuildDir(), agentLibPath)
+	agentBuilderLibPath := filepath.Join(stager.BuildDir(), installDir, agentLibPath)
 
 	if _, err = os.Stat(agentBuilderLibPath); os.IsNotExist(err) {
 		h.Log.Error("Agent library (%s) not found!", agentBuilderLibPath)
@@ -250,13 +258,12 @@ func (h *Hook) downloadAndInstallWindows(creds *credentials, ver string, lang st
 	}
 
 	h.Log.BeginStep("Setting up Dynatrace OneAgent injection...")
-
+	h.Log.Debug("Copy %s to %s", dynatraceEnvName, dynatraceEnvPath)
 	err = os.MkdirAll(filepath.Join(stager.DepDir(), "profile.d"), os.ModePerm)
 	if err != nil {
 		return err
 	}
 
-	dynatraceEnvPath := filepath.Join(stager.DepDir(), "profile.d", "dynatrace-env.cmd")
 	h.Log.Debug("Creating %s...", dynatraceEnvPath)
 	f, err := os.OpenFile(dynatraceEnvPath, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
@@ -267,41 +274,29 @@ func (h *Hook) downloadAndInstallWindows(creds *credentials, ver string, lang st
 	defer f.Close()
 
 	extra := ""
-
 	extra += "set COR_ENABLE_PROFILING=1\n"
 	extra += "set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}\n"
 	extra += "set DT_AGENTACTIVE=true\n"
 	extra += "set DT_LOGLEVEL=DEBUG\n"
 	extra += "set DT_LOGLEVELCON=DEBUG\n"
-	extra += fmt.Sprintf("set COR_PROFILER_PATH_32=%s\n", "agent\\lib\\oneagentloader.dll")
-	extra += fmt.Sprintf("set COR_PROFILER_PATH_64=%s\n", "agent\\lib64\\oneagentloader.dll")
+	extra += fmt.Sprintf("set COR_PROFILER_PATH_64=%s\n", agentBuilderLibPath)
 
 	if creds.NetworkZone != "" {
+		h.Log.Debug("Setting DT_NETWORK_ZONE...")
 		extra += "set DT_NETWORK_ZONE=" + creds.NetworkZone
 	}
 
-	// if creds.NetworkZone != "" {
-	// 	h.Log.Debug("Setting DT_NETWORK_ZONE...")
-	// 	extra += fmt.Sprintf("\nexport DT_NETWORK_ZONE=${DT_NETWORK_ZONE:-%s}", creds.NetworkZone)
-	// }
-
-	// // By default, OneAgent logs are printed to stderr. If the customer doesn't override this behavior through an
-	// // environment variable, then we change the default output to stdout.
-	// if os.Getenv("DT_LOGSTREAM") == "" {
-	// 	h.Log.Debug("Setting DT_LOGSTREAM to stdout...")
-	// 	extra += "\nexport DT_LOGSTREAM=stdout"
-	// }
-
-	// h.Log.Debug("Preparing custom properties...")
-	// extra += fmt.Sprintf(
-	// 	"\nexport DT_CUSTOM_PROP=\"${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=%s CloudFoundryBuildpackVersion=%s\"", lang, ver)
+	h.Log.Debug("Preparing custom properties...")
+	extra += fmt.Sprintf(
+		"\nset DT_CUSTOM_PROP=\"${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=%s CloudFoundryBuildpackVersion=%s\"", lang, ver)
 
 	if _, err = f.WriteString(extra); err != nil {
 		return err
 	}
 
 	h.Log.Debug("Fetching updated OneAgent configuration from tenant... ")
-	if err := h.updateAgentConfig(creds, stager.BuildDir(), lang, ver); err != nil {
+	configDir := filepath.Join(stager.BuildDir(), installDir)
+	if err := h.updateAgentConfig(creds, configDir, lang, ver); err != nil {
 		if creds.SkipErrors {
 			h.Log.Warning("Error during agent config update, skipping it")
 			return nil
@@ -313,7 +308,7 @@ func (h *Hook) downloadAndInstallWindows(creds *credentials, ver string, lang st
 
 	if h.getCredentials().EnableFIPS {
 		h.Log.Debug("Removing file 'dt_fips_disabled.flag' to enable FIPS mode...")
-		flagFilePath := filepath.Join(stager.BuildDir(), stager.BuildDir(), "agent/dt_fips_disabled.flag")
+		flagFilePath := filepath.Join(stager.BuildDir(), installDir, "agent/dt_fips_disabled.flag")
 		if err := os.Remove(flagFilePath); err != nil {
 			h.Log.Error("Error during fips flag file deletion: %s", err)
 			return err
@@ -321,7 +316,7 @@ func (h *Hook) downloadAndInstallWindows(creds *credentials, ver string, lang st
 	}
 
 	h.Log.Info("Dynatrace OneAgent injection is set up.")
-	// 4
+
 	return nil
 }
 
@@ -502,7 +497,7 @@ func (h *Hook) ensureApiURL(creds *credentials) (string, error) {
 
 // findAgentPath reads the manifest file included in the OneAgent package, and looks
 // for the process agent file path.
-func (h *Hook) findAgentPath(installDir string) (string, error) {
+func (h *Hook) findAgentPath(installDir string, libraryFilename string, platformName string) (string, error) {
 	// With these classes, we try to replicate the structure for the manifest.json file, so that we can parse it.
 
 	type Binary struct {
@@ -517,10 +512,6 @@ func (h *Hook) findAgentPath(installDir string) (string, error) {
 		Technologies Technologies `json:"technologies"`
 	}
 
-	libraryFilename := "liboneagentproc.so"
-	if runtime.GOOS == "windows" {
-		libraryFilename = "oneagentproc.dll"
-	}
 	fallbackPath := filepath.Join("agent", "lib64", libraryFilename)
 
 	manifestPath := filepath.Join(installDir, "manifest.json")
@@ -535,11 +526,6 @@ func (h *Hook) findAgentPath(installDir string) (string, error) {
 		return "", err
 	} else if err = json.Unmarshal(raw, &manifest); err != nil {
 		return "", err
-	}
-
-	platformName := "linux-x86-64"
-	if runtime.GOOS == "windows" {
-		platformName = "windows-x86-64"
 	}
 
 	for _, binary := range manifest.Technologies["process"][platformName] {
