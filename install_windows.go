@@ -75,7 +75,6 @@ func (h *Hook) setUpDotNetCorProfilerInjection(creds *credentials, ver string, l
 	dynatraceEnvName := "dynatrace-env.cmd"
 	dynatraceEnvPath := filepath.Join(stager.DepDir(), "profile.d", dynatraceEnvName)
 
-	h.Log.Debug("Copy %s to %s", dynatraceEnvName, dynatraceEnvPath)
 	err := os.MkdirAll(filepath.Join(stager.DepDir(), "profile.d"), os.ModePerm)
 	if err != nil {
 		return err
