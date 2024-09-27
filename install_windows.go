@@ -59,7 +59,7 @@ func (h *Hook) downloadAndInstall(creds *credentials, ver string, lang string, i
 
 	h.Log.BeginStep("Setting up Dynatrace OneAgent injection...")
 	if slices.Contains(h.IncludeTechnologies, "dotnet") {
-		err = h.setUpDotNetCorProfilerInjection(creds, ver, lang, agentBuilderLibPath, stager)
+		err = h.setUpDotNetCorProfilerInjection(creds, ver, lang, agentLibPath, stager)
 	} else {
 		h.Log.Warning("No injection method available for technology stack")
 		return nil
@@ -71,7 +71,7 @@ func (h *Hook) downloadAndInstall(creds *credentials, ver string, lang string, i
 	return nil
 }
 
-func (h *Hook) setUpDotNetCorProfilerInjection(creds *credentials, ver string, lang string, agentBuilderLibPath string, stager *libbuildpack.Stager) error {
+func (h *Hook) setUpDotNetCorProfilerInjection(creds *credentials, ver string, lang string, agentLibPath string, stager *libbuildpack.Stager) error {
 	dynatraceEnvName := "dynatrace-env.cmd"
 	dynatraceEnvPath := filepath.Join(stager.DepDir(), "profile.d", dynatraceEnvName)
 
@@ -95,7 +95,7 @@ func (h *Hook) setUpDotNetCorProfilerInjection(creds *credentials, ver string, l
 	extra += "set DT_AGENTACTIVE=true\n"
 	extra += "set DT_LOGLEVEL=DEBUG\n"
 	extra += "set DT_LOGLEVELCON=DEBUG\n"
-	extra += fmt.Sprintf("set COR_PROFILER_PATH_64=%s\n", agentBuilderLibPath)
+	extra += fmt.Sprintf("set COR_PROFILER_PATH_64=%s\n", agentLibPath)
 
 	if creds.NetworkZone != "" {
 		h.Log.Debug("Setting DT_NETWORK_ZONE...")
