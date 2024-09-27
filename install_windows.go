@@ -50,6 +50,7 @@ func (h *Hook) downloadAndInstall(creds *credentials, ver string, lang string, i
 
 	// a windows path contains "\" instead of "/"
 	agentLibPath = strings.ReplaceAll(agentLibPath, "/", "\\")
+	agentLibPath = filepath.Join(installDir, agentLibPath)
 
 	agentBuilderLibPath := filepath.Join(stager.BuildDir(), installDir, agentLibPath)
 	if _, err = os.Stat(agentBuilderLibPath); os.IsNotExist(err) {
