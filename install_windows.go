@@ -48,7 +48,7 @@ func (h *Hook) downloadAndInstall(creds *credentials, ver string, lang string, i
 		return err
 	}
 
-	// a windows path contains "\" instead of "/", so we need do replace them here
+	// a windows path contains "\" instead of "/"
 	agentLibPath = strings.ReplaceAll(agentLibPath, "/", "\\")
 
 	agentBuilderLibPath := filepath.Join(stager.BuildDir(), installDir, agentLibPath)
