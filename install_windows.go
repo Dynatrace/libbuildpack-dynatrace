@@ -52,6 +52,8 @@ func (h *Hook) downloadAndInstall(creds *credentials, ver string, lang string, i
 	agentLibPath = strings.ReplaceAll(agentLibPath, "/", "\\")
 	agentLibPath = filepath.Join(installDir, agentLibPath)
 
+	agentLibPath = "dynatrace/oneagent/agent/lib/oneagentloader.dll"
+
 	agentBuilderLibPath := filepath.Join(stager.BuildDir(), agentLibPath)
 	if _, err = os.Stat(agentBuilderLibPath); os.IsNotExist(err) {
 		h.Log.Error("Agent library (%s) not found!", agentBuilderLibPath)
