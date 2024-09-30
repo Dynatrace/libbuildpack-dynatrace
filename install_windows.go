@@ -5,8 +5,7 @@ package dynatrace
 
 import (
 	"fmt"
-	"io/ioutil"
-	"log"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -109,14 +108,9 @@ func (h *Hook) findAbsoluteLoaderPath(stager *libbuildpack.Stager, installDir st
 	// e.g. at \tmp\app\dynatrace\oneagent\agent\bin\1.303.0.20240930-081133\windows-x86-32\oneagentloader.dll
 	loaderDllPathInBuildDir := filepath.Join(stager.BuildDir(), loaderDllPathInAppDir)
 
-	files, err := ioutil.ReadDir("\tmp\app")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	for _, file := range files {
-		fmt.Println(file.Name(), file.IsDir())
-	}
+	filepath.Walk(stager.BuildDir(), func(path string, info fs.FileInfo, err error) error {
+		fmt.Println("* " + path)
+	})
 
 	fmt.Printf("-%s-\n", loaderDllPathInBuildDir)
 	/*if _, err = os.Stat(loaderDllPathInBuildDir); os.IsNotExist(err) {
