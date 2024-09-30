@@ -58,12 +58,12 @@ func (h *Hook) downloadAndInstall(creds *credentials, ver string, lang string, i
 func (h *Hook) setUpDotNetCorProfilerInjection(creds *credentials, ver string, lang string, installDir string, stager *libbuildpack.Stager) error {
 	loaderPath32, err := h.findAbsoluteLoaderPath(stager, installDir, "windows-x86-32")
 	if err != nil {
-		return fmt.Errorf("cannot find 32 bit oneagentloader.dll")
+		return fmt.Errorf("cannot find 32 bit oneagentloader.dll: %s", err)
 	}
 
 	loaderPath64, err := h.findAbsoluteLoaderPath(stager, installDir, "windows-x86-32")
 	if err != nil {
-		return fmt.Errorf("cannot find 64 bit oneagentloader.dll")
+		return fmt.Errorf("cannot find 64 bit oneagentloader.dll: %s", err)
 	}
 
 	scriptContent := "set COR_ENABLE_PROFILING=1\n"
