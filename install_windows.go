@@ -62,6 +62,8 @@ func (h *Hook) setUpDotNetCorProfilerInjection(creds *credentials, ver string, l
 		return err
 	}
 
+	h.Log.Error("%+v", stager)
+
 	// windows path separator is "\" instead of "/"
 	agentLibPath = strings.ReplaceAll(agentLibPath, "/", "\\")
 	agentLibPath = filepath.Join(installDir, agentLibPath)
