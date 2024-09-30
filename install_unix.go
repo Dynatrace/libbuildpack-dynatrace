@@ -48,7 +48,7 @@ func (h *Hook) downloadAndInstall(creds *credentials, ver string, lang string, i
 
 	dynatraceEnvName := "dynatrace-env.sh"
 	dynatraceEnvPath := filepath.Join(stager.DepDir(), "profile.d", dynatraceEnvName)
-	agentLibPath, err := h.findAgentPath(filepath.Join(stager.BuildDir(), installDir), "liboneagentproc.so", "linux-x86-64")
+	agentLibPath, err := h.findAgentPath(filepath.Join(stager.BuildDir(), installDir), "process", "binary", "liboneagentproc.so", "linux-x86-64")
 	if err != nil {
 		h.Log.Error("Manifest handling failed!")
 		return err

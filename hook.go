@@ -295,7 +295,7 @@ func (h *Hook) ensureApiURL(creds *credentials) (string, error) {
 
 // findAgentPath reads the manifest file included in the OneAgent package, and looks
 // for the process agent file path.
-func (h *Hook) findAgentPath(installDir string, libraryFilename string, platformName string) (string, error) {
+func (h *Hook) findAgentPath(installDir string, technology string, binaryType string, libraryFilename string, platformName string) (string, error) {
 	// With these classes, we try to replicate the structure for the manifest.json file, so that we can parse it.
 
 	type Binary struct {
@@ -327,7 +327,7 @@ func (h *Hook) findAgentPath(installDir string, libraryFilename string, platform
 	}
 
 	for _, binary := range manifest.Technologies["process"][platformName] {
-		if binary.BinaryType == "primary" {
+		if binary.BinaryType == binaryType {
 			return binary.Path, nil
 		}
 	}

@@ -31,7 +31,8 @@ func (h *Hook) downloadAndInstall(creds *credentials, ver string, lang string, i
 	h.Log.BeginStep("Starting Dynatrace OneAgent installation")
 
 	h.Log.Info("Unzipping archive '%s' to '%s'", installerFilePath, filepath.Join(stager.BuildDir(), installDir))
-	if err := libbuildpack.ExtractZip(installerFilePath, filepath.Join(stager.BuildDir(), installDir)); err != nil {
+	err := libbuildpack.ExtractZip(installerFilePath, filepath.Join(stager.BuildDir(), installDir))
+	if err != nil {
 		h.Log.Error("Error during unzipping paas archive")
 		return err
 	}
@@ -40,27 +41,9 @@ func (h *Hook) downloadAndInstall(creds *credentials, ver string, lang string, i
 
 	// Post-installation setup...
 
-	agentLibPath, err := h.findAgentPath(filepath.Join(stager.BuildDir(), installDir), "oneagentproc.dll", "windows-x86-64")
-	if err != nil {
-		h.Log.Error("Manifest handling failed!")
-		return err
-	}
-
-	// windows path separator is "\" instead of "/"
-	agentLibPath = strings.ReplaceAll(agentLibPath, "/", "\\")
-	agentLibPath = filepath.Join(installDir, agentLibPath)
-
-	agentLibPath = "C:\\users\\vcap\\app\\dynatrace\\oneagent\\agent\\lib64\\oneagentproc.dll"
-
-	agentBuilderLibPath := filepath.Join(stager.BuildDir(), agentLibPath)
-	if _, err = os.Stat(agentBuilderLibPath); os.IsNotExist(err) {
-		h.Log.Error("Agent library (%s) not found!", agentBuilderLibPath)
-		return err
-	}
-
 	h.Log.BeginStep("Setting up Dynatrace OneAgent injection...")
 	if slices.Contains(h.IncludeTechnologies, "dotnet") {
-		err = h.setUpDotNetCorProfilerInjection(creds, ver, lang, agentLibPath, stager)
+		err = h.setUpDotNetCorProfilerInjection(creds, ver, lang, installDir, stager)
 	} else {
 		h.Log.Warning("No injection method available for technology stack")
 		return nil
@@ -72,7 +55,23 @@ func (h *Hook) downloadAndInstall(creds *credentials, ver string, lang string, i
 	return nil
 }
 
-func (h *Hook) setUpDotNetCorProfilerInjection(creds *credentials, ver string, lang string, agentLibPath string, stager *libbuildpack.Stager) error {
+func (h *Hook) setUpDotNetCorProfilerInjection(creds *credentials, ver string, lang string, installDir string, stager *libbuildpack.Stager) error {
+	agentLibPath, err := h.findAgentPath(filepath.Join(stager.BuildDir(), installDir), "dotnet", "loader", "oneagentloader.dll", "windows-x86-64")
+	if err != nil {
+		h.Log.Error("Manifest handling failed!")
+		return err
+	}
+
+	// windows path separator is "\" instead of "/"
+	agentLibPath = strings.ReplaceAll(agentLibPath, "/", "\\")
+	agentLibPath = filepath.Join(installDir, agentLibPath)
+
+	agentBuilderLibPath := filepath.Join(stager.BuildDir(), agentLibPath)
+	if _, err = os.Stat(agentBuilderLibPath); os.IsNotExist(err) {
+		h.Log.Error("Agent library (%s) not found!", agentBuilderLibPath)
+		return err
+	}
+
 	scriptContent := "set COR_ENABLE_PROFILING=1\n"
 	scriptContent += "set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}\n"
 	scriptContent += "set DT_AGENTACTIVE=true\n"
