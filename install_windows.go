@@ -105,10 +105,11 @@ func (h *Hook) findAbsoluteLoaderPath(stager *libbuildpack.Stager, installDir st
 
 	// check that the loader dll is present in the build dir
 	loaderDllPathInBuildDir := filepath.Join(stager.BuildDir(), loaderDllPathInAppDir)
-	if _, err = os.Stat(loaderDllPathInBuildDir); os.IsNotExist(err) {
+	fmt.Printf("%s", loaderDllPathInBuildDir)
+	/*if _, err = os.Stat(loaderDllPathInBuildDir); os.IsNotExist(err) {
 		h.Log.Error("Agent library (%s) not found!", loaderDllPathInBuildDir)
 		return "", err
-	}
+	}*/
 
 	// build the absolute path of the loader DLL as it will be available at runtime
 	return filepath.Join("C:\\users\\vcap\\app", loaderDllPathInAppDir), nil
