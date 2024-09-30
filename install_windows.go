@@ -73,24 +73,22 @@ func (h *Hook) downloadAndInstall(creds *credentials, ver string, lang string, i
 }
 
 func (h *Hook) setUpDotNetCorProfilerInjection(creds *credentials, ver string, lang string, agentLibPath string, stager *libbuildpack.Stager) error {
-	scriptContent := ""
-	scriptContent += "set COR_ENABLE_PROFILING=1\n"
+	scriptContent := "set COR_ENABLE_PROFILING=1\n"
 	scriptContent += "set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}\n"
 	scriptContent += "set DT_AGENTACTIVE=true\n"
 	scriptContent += "set DT_BLOCKLIST=powershell*\n"
-	scriptContent += fmt.Sprintf("set COR_PROFILER_PATH_32=C:\\Users\\vcap\\app\\%s\n", agentLibPath)
-	scriptContent += fmt.Sprintf("set COR_PROFILER_PATH_64=C:\\Users\\vcap\\app\\%s\n", agentLibPath)
+	scriptContent += fmt.Sprintf("set COR_PROFILER_PATH_32=%s\n", agentLibPath)
+	scriptContent += fmt.Sprintf("set COR_PROFILER_PATH_64=%s\n", agentLibPath)
 
 	if creds.NetworkZone != "" {
 		h.Log.Debug("Setting DT_NETWORK_ZONE...")
-		scriptContent += "set DT_NETWORK_ZONE=" + creds.NetworkZone
+		scriptContent += "set DT_NETWORK_ZONE=" + creds.NetworkZone + "\n"
 	}
 
 	h.Log.Debug("Preparing custom properties...")
-	scriptContent += fmt.Sprintf(
-		"\nset DT_CUSTOM_PROP=\"%%DT_CUSTOM_PROP%% CloudFoundryBuildpackLanguage=%s CloudFoundryBuildpackVersion=%s\"", lang, ver)
+	scriptContent += fmt.Sprintf("set DT_CUSTOM_PROP=\"%%DT_CUSTOM_PROP%% CloudFoundryBuildpackLanguage=%s CloudFoundryBuildpackVersion=%s\"\n", lang, ver)
 
-	stager.WriteProfileD("danatrace-env.cmd", scriptContent)
+	stager.WriteProfileD("dynatrace-env.cmd", scriptContent)
 
 	return nil
 }
