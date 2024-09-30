@@ -5,7 +5,6 @@ package dynatrace
 
 import (
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -57,22 +56,16 @@ func (h *Hook) downloadAndInstall(creds *credentials, ver string, lang string, i
 }
 
 func (h *Hook) setUpDotNetCorProfilerInjection(creds *credentials, ver string, lang string, installDir string, stager *libbuildpack.Stager) error {
-	loaderPath32, err := h.findAbsoluteLoaderPath(stager, installDir, "windows-x86-32")
+	loaderPath, err := h.findAbsoluteLoaderPath(stager, installDir)
 	if err != nil {
-		return fmt.Errorf("cannot find 32 bit oneagentloader.dll: %s", err)
-	}
-
-	loaderPath64, err := h.findAbsoluteLoaderPath(stager, installDir, "windows-x86-32")
-	if err != nil {
-		return fmt.Errorf("cannot find 64 bit oneagentloader.dll: %s", err)
+		return fmt.Errorf("cannot find oneagentloader.dll: %s", err)
 	}
 
 	scriptContent := "set COR_ENABLE_PROFILING=1\n"
 	scriptContent += "set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}\n"
 	scriptContent += "set DT_AGENTACTIVE=true\n"
 	scriptContent += "set DT_BLOCKLIST=powershell*\n"
-	scriptContent += fmt.Sprintf("set COR_PROFILER_PATH_32=%s\n", loaderPath32)
-	scriptContent += fmt.Sprintf("set COR_PROFILER_PATH_64=%s\n", loaderPath64)
+	scriptContent += fmt.Sprintf("set COR_PROFILER_PATH_64=%s\n", loaderPath)
 
 	if creds.NetworkZone != "" {
 		h.Log.Debug("Setting DT_NETWORK_ZONE...")
@@ -87,11 +80,11 @@ func (h *Hook) setUpDotNetCorProfilerInjection(creds *credentials, ver string, l
 	return nil
 }
 
-func (h *Hook) findAbsoluteLoaderPath(stager *libbuildpack.Stager, installDir string, architecture string) (string, error) {
+func (h *Hook) findAbsoluteLoaderPath(stager *libbuildpack.Stager, installDir string) (string, error) {
 
 	// look for dotnet loader DLL file relative to the root of the downloaded zip archive
 	// and get the path from the manifest e.g. agent/bin/windows-x86-64/oneagentloader.dll
-	loaderDllPath, err := h.findAgentPath(filepath.Join(stager.BuildDir(), installDir), "dotnet", "loader", "oneagentloader.dll", architecture)
+	loaderDllPath, err := h.findAgentPath(filepath.Join(stager.BuildDir(), installDir), "dotnet", "loader", "oneagentloader.dll", "windows-x86-64")
 	if err != nil {
 		h.Log.Error("Manifest handling failed!")
 		return "", err
@@ -108,16 +101,10 @@ func (h *Hook) findAbsoluteLoaderPath(stager *libbuildpack.Stager, installDir st
 	// e.g. at \tmp\app\dynatrace\oneagent\agent\bin\1.303.0.20240930-081133\windows-x86-32\oneagentloader.dll
 	loaderDllPathInBuildDir := filepath.Join(stager.BuildDir(), loaderDllPathInAppDir)
 
-	filepath.Walk(stager.BuildDir(), func(path string, info fs.FileInfo, err error) error {
-		fmt.Println("* " + path)
-		return nil
-	})
-
-	fmt.Printf("-%s-\n", loaderDllPathInBuildDir)
-	/*if _, err = os.Stat(loaderDllPathInBuildDir); os.IsNotExist(err) {
+	if _, err = os.Stat(loaderDllPathInBuildDir); os.IsNotExist(err) {
 		h.Log.Error("Agent library (%s) not found!", loaderDllPathInBuildDir)
 		return "", err
-	}*/
+	}
 
 	// build the absolute path of the loader DLL as it will be available at runtime
 	return filepath.Join("C:\\users\\vcap\\app", loaderDllPathInAppDir), nil
