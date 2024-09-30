@@ -5,6 +5,8 @@ package dynatrace
 
 import (
 	"fmt"
+	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"slices"
@@ -104,7 +106,18 @@ func (h *Hook) findAbsoluteLoaderPath(stager *libbuildpack.Stager, installDir st
 	loaderDllPathInAppDir := filepath.Join(installDir, loaderDllPath)
 
 	// check that the loader dll is present in the build dir
+	// e.g. at \tmp\app\dynatrace\oneagent\agent\bin\1.303.0.20240930-081133\windows-x86-32\oneagentloader.dll
 	loaderDllPathInBuildDir := filepath.Join(stager.BuildDir(), loaderDllPathInAppDir)
+
+	files, err := ioutil.ReadDir("\tmp\app")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, file := range files {
+		fmt.Println(file.Name(), file.IsDir())
+	}
+
 	fmt.Printf("-%s-\n", loaderDllPathInBuildDir)
 	/*if _, err = os.Stat(loaderDllPathInBuildDir); os.IsNotExist(err) {
 		h.Log.Error("Agent library (%s) not found!", loaderDllPathInBuildDir)
