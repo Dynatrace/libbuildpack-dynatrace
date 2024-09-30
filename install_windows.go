@@ -4,9 +4,7 @@
 package dynatrace
 
 import (
-	"archive/zip"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -33,7 +31,7 @@ func (h *Hook) downloadAndInstall(creds *credentials, ver string, lang string, i
 	h.Log.BeginStep("Starting Dynatrace OneAgent installation")
 
 	h.Log.Info("Unzipping archive '%s' to '%s'", installerFilePath, filepath.Join(stager.BuildDir(), installDir))
-	if err := h.unzipArchive(installerFilePath, filepath.Join(stager.BuildDir(), installDir)); err != nil {
+	if err := libbuildpack.ExtractZip(installerFilePath, filepath.Join(stager.BuildDir(), installDir)); err != nil {
 		h.Log.Error("Error during unzipping paas archive")
 		return err
 	}
@@ -93,11 +91,9 @@ func (h *Hook) setUpDotNetCorProfilerInjection(creds *credentials, ver string, l
 	defer f.Close()
 
 	extra := ""
-	extra += "set COR_ENABLE_PROFILING=0x1\n"
+	extra += "set COR_ENABLE_PROFILING=1\n"
 	extra += "set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}\n"
 	extra += "set DT_AGENTACTIVE=true\n"
-	extra += "set DT_LOGLEVEL=DEBUG\n"
-	extra += "set DT_LOGLEVELCON=DEBUG\n"
 	extra += "set DT_BLOCKLIST=powershell*\n"
 	extra += fmt.Sprintf("set COR_PROFILER_PATH_32=C:\\Users\\vcap\\app\\%s\n", agentLibPath)
 	extra += fmt.Sprintf("set COR_PROFILER_PATH_64=C:\\Users\\vcap\\app\\%s\n", agentLibPath)
@@ -115,66 +111,6 @@ func (h *Hook) setUpDotNetCorProfilerInjection(creds *credentials, ver string, l
 
 	if _, err = f.WriteString(extra); err != nil {
 		return err
-	}
-
-	return nil
-}
-
-func (h *Hook) unzipArchive(src, dest string) error {
-	r, err := zip.OpenReader(src)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err := r.Close(); err != nil {
-			panic(err)
-		}
-	}()
-
-	extractAndWriteFile := func(f *zip.File) error {
-		rc, err := f.Open()
-		if err != nil {
-			return err
-		}
-		defer func() {
-			if err := rc.Close(); err != nil {
-				panic(err)
-			}
-		}()
-
-		path := filepath.Join(dest, f.Name)
-
-		if !strings.HasPrefix(path, filepath.Clean(dest)+string(os.PathSeparator)) {
-			return fmt.Errorf("illegal file path: %s", path)
-		}
-
-		if f.FileInfo().IsDir() {
-			os.MkdirAll(path, f.Mode())
-		} else {
-			os.MkdirAll(filepath.Dir(path), f.Mode())
-			f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
-			if err != nil {
-				return err
-			}
-			defer func() {
-				if err := f.Close(); err != nil {
-					panic(err)
-				}
-			}()
-
-			_, err = io.Copy(f, rc)
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	for _, f := range r.File {
-		err := extractAndWriteFile(f)
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
