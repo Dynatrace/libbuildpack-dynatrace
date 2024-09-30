@@ -278,6 +278,9 @@ var _ = Describe("dynatraceHook", func() {
 				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
 					api_header_check)
 
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/windows/paas/latest?bitness=64&include=nginx&include=process&include=dotnet",
+					api_header_check)
+
 				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/processmoduleconfig",
 					api_header_check)
 			})
