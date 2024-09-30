@@ -50,7 +50,7 @@ func (h *Hook) downloadAndInstall(creds *credentials, ver string, lang string, i
 	agentLibPath = strings.ReplaceAll(agentLibPath, "/", "\\")
 	agentLibPath = filepath.Join(installDir, agentLibPath)
 
-	agentLibPath = "C:\\users\\vcap\\app\\dynatrace\\oneagent\\agent\\lib64\\oneagentloader.dll"
+	agentLibPath = "C:\\users\\vcap\\app\\dynatrace\\oneagent\\agent\\lib64\\oneagentproc.dll"
 
 	agentBuilderLibPath := filepath.Join(stager.BuildDir(), agentLibPath)
 	if _, err = os.Stat(agentBuilderLibPath); os.IsNotExist(err) {
