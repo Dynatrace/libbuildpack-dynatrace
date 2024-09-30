@@ -73,45 +73,24 @@ func (h *Hook) downloadAndInstall(creds *credentials, ver string, lang string, i
 }
 
 func (h *Hook) setUpDotNetCorProfilerInjection(creds *credentials, ver string, lang string, agentLibPath string, stager *libbuildpack.Stager) error {
-	dynatraceEnvName := "dynatrace-env.cmd"
-	dynatraceEnvPath := filepath.Join(stager.DepDir(), "profile.d", dynatraceEnvName)
-
-	err := os.MkdirAll(filepath.Join(stager.DepDir(), "profile.d"), os.ModePerm)
-	if err != nil {
-		return err
-	}
-
-	h.Log.Debug("Creating %s...", dynatraceEnvPath)
-	f, err := os.OpenFile(dynatraceEnvPath, os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		h.Log.Error("Cannot create dynatrace-env.cmd!")
-		return err
-	}
-
-	defer f.Close()
-
-	extra := ""
-	extra += "set COR_ENABLE_PROFILING=1\n"
-	extra += "set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}\n"
-	extra += "set DT_AGENTACTIVE=true\n"
-	extra += "set DT_BLOCKLIST=powershell*\n"
-	extra += fmt.Sprintf("set COR_PROFILER_PATH_32=C:\\Users\\vcap\\app\\%s\n", agentLibPath)
-	extra += fmt.Sprintf("set COR_PROFILER_PATH_64=C:\\Users\\vcap\\app\\%s\n", agentLibPath)
+	scriptContent := ""
+	scriptContent += "set COR_ENABLE_PROFILING=1\n"
+	scriptContent += "set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}\n"
+	scriptContent += "set DT_AGENTACTIVE=true\n"
+	scriptContent += "set DT_BLOCKLIST=powershell*\n"
+	scriptContent += fmt.Sprintf("set COR_PROFILER_PATH_32=C:\\Users\\vcap\\app\\%s\n", agentLibPath)
+	scriptContent += fmt.Sprintf("set COR_PROFILER_PATH_64=C:\\Users\\vcap\\app\\%s\n", agentLibPath)
 
 	if creds.NetworkZone != "" {
 		h.Log.Debug("Setting DT_NETWORK_ZONE...")
-		extra += "set DT_NETWORK_ZONE=" + creds.NetworkZone
+		scriptContent += "set DT_NETWORK_ZONE=" + creds.NetworkZone
 	}
 
 	h.Log.Debug("Preparing custom properties...")
-	extra += fmt.Sprintf(
+	scriptContent += fmt.Sprintf(
 		"\nset DT_CUSTOM_PROP=\"${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=%s CloudFoundryBuildpackVersion=%s\"", lang, ver)
 
-	extra += "\necho DONE"
-
-	if _, err = f.WriteString(extra); err != nil {
-		return err
-	}
+	stager.WriteProfileD("danatrace-env.cmd", scriptContent)
 
 	return nil
 }
