@@ -111,6 +111,8 @@ func (h *Hook) setUpDotNetCorProfilerInjection(creds *credentials, ver string, l
 	extra += fmt.Sprintf(
 		"\nset DT_CUSTOM_PROP=\"${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=%s CloudFoundryBuildpackVersion=%s\"", lang, ver)
 
+	extra += "\necho DONE"
+
 	if _, err = f.WriteString(extra); err != nil {
 		return err
 	}
