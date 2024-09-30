@@ -93,11 +93,13 @@ func (h *Hook) setUpDotNetCorProfilerInjection(creds *credentials, ver string, l
 	defer f.Close()
 
 	extra := ""
-	extra += "set COR_ENABLE_PROFILING=1\n"
+	extra += "set COR_ENABLE_PROFILING=0x1\n"
 	extra += "set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}\n"
 	extra += "set DT_AGENTACTIVE=true\n"
 	extra += "set DT_LOGLEVEL=DEBUG\n"
 	extra += "set DT_LOGLEVELCON=DEBUG\n"
+	extra += "set DT_BLOCKLIST=powershell*\n"
+	extra += fmt.Sprintf("set COR_PROFILER_PATH_32=%s\n", agentLibPath)
 	extra += fmt.Sprintf("set COR_PROFILER_PATH_64=%s\n", agentLibPath)
 
 	if creds.NetworkZone != "" {
