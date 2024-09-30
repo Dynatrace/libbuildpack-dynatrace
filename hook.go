@@ -326,7 +326,7 @@ func (h *Hook) findAgentPath(installDir string, technology string, binaryType st
 		return "", err
 	}
 
-	for _, binary := range manifest.Technologies["process"][platformName] {
+	for _, binary := range manifest.Technologies[technology][platformName] {
 		if binary.BinaryType == binaryType {
 			return binary.Path, nil
 		}
