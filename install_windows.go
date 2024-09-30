@@ -110,6 +110,7 @@ func (h *Hook) findAbsoluteLoaderPath(stager *libbuildpack.Stager, installDir st
 
 	filepath.Walk(stager.BuildDir(), func(path string, info fs.FileInfo, err error) error {
 		fmt.Println("* " + path)
+		return nil
 	})
 
 	fmt.Printf("-%s-\n", loaderDllPathInBuildDir)
