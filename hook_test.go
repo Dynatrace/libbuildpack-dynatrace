@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -20,23 +21,57 @@ import (
 	"github.com/jarcoal/httpmock"
 )
 
+const manifestJson = `{
+	"version" : "1.130.0.20170914-153344",
+	"technologies" : {
+		"process" : {
+			"linux-x86-64" : [ 
+				{
+					"path" : "agent/conf/runtime/default/process/binary_linux-x86-64",
+					"md5" : "e086f9c70b53cd456988ff5c4d414f36",
+					"version" : "1.130.0.20170914-125024"
+				}, 
+				{
+					"path" : "agent/lib64/liboneagentproc.so",
+					"md5" : "2bf4ba9e90e2589428f6f6f3a964cba2",
+					"version" : "1.130.0.20170914-125024",
+					"binarytype" : "primary"
+				}
+			],
+			"windows-x86-64" : [
+				{
+					"path" : "agent/conf/runtime/default/process/windows_linux-x86-64",
+					"md5" : "e086f9c70b53cd456988ff5c4d414f36",
+					"version" : "1.130.0.20170914-125024"
+				},  
+				{
+					"path" : "agent/lib64/oneagentloader.dll",
+					"md5" : "2bf4ba9e90e2589428f6f6f3a964cba2",
+					"version" : "1.130.0.20170914-125024",
+					"binarytype" : "loader"
+				}
+			]
+		}
+	}
+}`
+
 //go:generate mockgen -source=hook.go --destination=mocks_test.go --package=dynatrace_test
 
 var _ = Describe("dynatraceHook", func() {
 	var (
-		err              error
-		bpDir            string
-		buildDir         string
-		depsDir          string
-		depsIdx          string
-		logger           *libbuildpack.Logger
-		stager           *libbuildpack.Stager
-		mockCtrl         *gomock.Controller
-		mockCommand      *MockCommand
-		buffer           *bytes.Buffer
-		hook             dynatrace.Hook
-		runInstaller     func(string, io.Writer, io.Writer, string, string)
-		api_header_check func(req *http.Request) (*http.Response, error)
+		err                   error
+		bpDir                 string
+		buildDir              string
+		depsDir               string
+		depsIdx               string
+		logger                *libbuildpack.Logger
+		stager                *libbuildpack.Stager
+		mockCtrl              *gomock.Controller
+		mockCommand           *MockCommand
+		buffer                *bytes.Buffer
+		hook                  dynatrace.Hook
+		simulateUnixInstaller func(string, io.Writer, io.Writer, string, string)
+		api_header_check      func(req *http.Request) (*http.Response, error)
 	)
 
 	BeforeEach(func() {
@@ -65,8 +100,6 @@ var _ = Describe("dynatraceHook", func() {
 		}
 
 		api_header_check = func(req *http.Request) (*http.Response, error) {
-			resp := httpmock.NewStringResponse(200, "echo Install Dynatrace")
-
 			resp_header := req.Header.Get("Authorization")
 			if resp_header == "" {
 				return httpmock.NewStringResponse(500, `{"error": "No Authorization Header found"}`), nil
@@ -74,6 +107,8 @@ var _ = Describe("dynatraceHook", func() {
 			if strings.Index(resp_header, "Api-Token") == -1 {
 				return httpmock.NewStringResponse(500, `{"error": "No Api-Token found in Authorization Header"}`), nil
 			}
+
+			resp := getMockResponse()
 
 			return resp, nil
 		}
@@ -85,8 +120,8 @@ var _ = Describe("dynatraceHook", func() {
 
 		httpmock.Reset()
 
-		runInstaller = func(_ string, _, _ io.Writer, file string, _ string) {
-			contents, err := ioutil.ReadFile(file)
+		simulateUnixInstaller = func(_ string, _, _ io.Writer, file string, _ string) {
+			contents, err := os.ReadFile(file)
 			Expect(err).To(BeNil())
 
 			Expect(string(contents)).To(Equal("echo Install Dynatrace"))
@@ -100,23 +135,6 @@ var _ = Describe("dynatraceHook", func() {
 			err = ioutil.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/dynatrace-env.sh"), []byte("echo running dynatrace-env.sh"), 0644)
 			Expect(err).To(BeNil())
 
-			manifestJson := `
-			{
-				"version" : "1.130.0.20170914-153344",
-				"technologies" : {
-					"process" : {
-						"linux-x86-64" : [ {
-							"path" : "agent/conf/runtime/default/process/binary_linux-x86-64",
-							"md5" : "e086f9c70b53cd456988ff5c4d414f36",
-							"version" : "1.130.0.20170914-125024"
-						  }, {
-							"path" : "agent/lib64/liboneagentproc.so",
-							"md5" : "2bf4ba9e90e2589428f6f6f3a964cba2",
-							"version" : "1.130.0.20170914-125024",
-							"binarytype" : "primary"}]
-					}
-				}
-			}`
 			err = ioutil.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/manifest.json"), []byte(manifestJson), 0664)
 			Expect(err).To(BeNil())
 
@@ -135,6 +153,8 @@ var _ = Describe("dynatraceHook", func() {
 			err = ioutil.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/agent/conf/ruxitagentproc.conf"), []byte(ruxitagentproc), 0664)
 			Expect(err).To(BeNil())
 
+			err = ioutil.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/agent/dt_fips_disabled.flag"), []byte(""), 0664)
+			Expect(err).To(BeNil())
 		}
 	})
 
@@ -275,27 +295,88 @@ var _ = Describe("dynatraceHook", func() {
 					"2": [{"name":"redis"}]
 				}`)
 
-				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/"+OSName+"/"+InstallationMethod+"/latest?bitness=64&include=nginx&include=process&include=dotnet",
 					api_header_check)
 
 				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/processmoduleconfig",
 					api_header_check)
+
 			})
 
 			It("installs dynatrace", func() {
-				mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(runInstaller)
+				if runtime.GOOS != "windows" {
+					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
+				}
 
 				err = hook.AfterCompile(stager)
 				Expect(err).To(BeNil())
 
 				// Sets up profile.d
-				contents, err := ioutil.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", "dynatrace-env.sh"))
+				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
 				Expect(err).To(BeNil())
 
-				Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
+				if runtime.GOOS == "windows" {
+					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
+set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
+set DT_AGENTACTIVE=true
+set DT_BLOCKLIST=powershell*
+set COR_PROFILER_PATH_64=C:\users\vcap\app\dynatrace\oneagent\agent\lib64\oneagentloader.dll
+set DT_CUSTOM_PROP="%DT_CUSTOM_PROP% CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"
+`))
+				} else {
+					Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
 export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so
 export DT_LOGSTREAM=stdout
 export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"`))
+				}
+			})
+		})
+
+		Context("VCAP_SERVICES contains dynatrace service with customoneagenturl", func() {
+			BeforeEach(func() {
+				os.Setenv("BP_DEBUG", "true")
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Setenv("VCAP_SERVICES", `{
+					"0": [{"name":"mysql"}],
+					"1": [{"name":"dynatrace","credentials":{"apiurl":"https://example.com","apitoken":"`+apiToken+`","environmentid":"`+environmentID+`","customoneagenturl":"https://example.com/oneagent"}}],
+					"2": [{"name":"redis"}]
+				}`)
+
+				httpmock.RegisterResponder("GET", "https://example.com/oneagent", func(r *http.Request) (*http.Response, error) {
+					return getMockResponse(), nil
+				})
+
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/processmoduleconfig",
+					api_header_check)
+
+			})
+
+			It("installs dynatrace", func() {
+				if runtime.GOOS != "windows" {
+					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
+				}
+
+				err = hook.AfterCompile(stager)
+				Expect(err).To(BeNil())
+
+				// Sets up profile.d
+				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
+				Expect(err).To(BeNil())
+
+				if runtime.GOOS == "windows" {
+					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
+set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
+set DT_AGENTACTIVE=true
+set DT_BLOCKLIST=powershell*
+set COR_PROFILER_PATH_64=C:\users\vcap\app\dynatrace\oneagent\agent\lib64\oneagentloader.dll
+set DT_CUSTOM_PROP="%DT_CUSTOM_PROP% CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"
+`))
+				} else {
+					Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
+export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so
+export DT_LOGSTREAM=stdout
+export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"`))
+				}
 			})
 		})
 
@@ -308,7 +389,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 					"2": [{"name":"redis"}]
 				}`)
 
-				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/"+OSName+"/"+InstallationMethod+"/latest?bitness=64&include=nginx&include=process&include=dotnet",
 					api_header_check)
 
 				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/processmoduleconfig",
@@ -316,7 +397,9 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 
 			It("installs dynatrace and writes comment to uxitagentproc.conf", func() {
-				mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(runInstaller)
+				if runtime.GOOS != "windows" {
+					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
+				}
 
 				err = hook.AfterCompile(stager)
 				Expect(err).To(BeNil())
@@ -324,20 +407,30 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				Expect(buffer.String()).To(ContainSubstring("Failed to fetch updated OneAgent config from the API"))
 
 				// Check for comment in ruxitagentproc.conf
-				contents, err := ioutil.ReadFile(filepath.Join(buildDir, "dynatrace/oneagent/agent/conf/ruxitagentproc.conf"))
+				contents, err := os.ReadFile(filepath.Join(buildDir, "dynatrace/oneagent/agent/conf/ruxitagentproc.conf"))
 				Expect(err).To(BeNil())
 
 				warn_string := "# Warning: Failed to fetch updated OneAgent config from the API. This config only includes settings provided by the installer."
 				Expect(strings.Contains(string(contents), warn_string)).To(BeTrue())
 
 				// Sets up profile.d
-				contents, err = ioutil.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", "dynatrace-env.sh"))
+				contents, err = os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
 				Expect(err).To(BeNil())
 
-				Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
+				if runtime.GOOS == "windows" {
+					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
+set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
+set DT_AGENTACTIVE=true
+set DT_BLOCKLIST=powershell*
+set COR_PROFILER_PATH_64=C:\users\vcap\app\dynatrace\oneagent\agent\lib64\oneagentloader.dll
+set DT_CUSTOM_PROP="%DT_CUSTOM_PROP% CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"
+`))
+				} else {
+					Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
 export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so
 export DT_LOGSTREAM=stdout
 export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"`))
+				}
 			})
 		})
 
@@ -351,7 +444,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 					"2": [{"name":"redis"}]
 				}`)
 
-				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/"+OSName+"/"+InstallationMethod+"/latest?bitness=64&include=nginx&include=process&include=dotnet",
 					api_header_check)
 
 				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/processmoduleconfig",
@@ -359,7 +452,10 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 
 			It("installs dynatrace", func() {
-				mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(runInstaller)
+
+				if runtime.GOOS != "windows" {
+					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
+				}
 
 				err = hook.AfterCompile(stager)
 				Expect(err).To(BeNil())
@@ -367,19 +463,29 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				Expect(buffer.String()).To(ContainSubstring("Successfully fetched updated OneAgent config from the API"))
 
 				// Check for comment in ruxitagentproc.conf
-				contents, err := ioutil.ReadFile(filepath.Join(buildDir, "dynatrace/oneagent/agent/conf/ruxitagentproc.conf"))
+				contents, err := os.ReadFile(filepath.Join(buildDir, "dynatrace", "oneagent", "agent", "conf", "ruxitagentproc.conf"))
 				Expect(err).To(BeNil())
 				configComment := "# This config is a merge between the installer and the Cluster config"
 				Expect(strings.Contains(string(contents), configComment)).To(BeTrue())
 
 				// Sets up profile.d
-				contents, err = ioutil.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", "dynatrace-env.sh"))
+				contents, err = os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
 				Expect(err).To(BeNil())
 
-				Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
+				if runtime.GOOS == "windows" {
+					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
+set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
+set DT_AGENTACTIVE=true
+set DT_BLOCKLIST=powershell*
+set COR_PROFILER_PATH_64=C:\users\vcap\app\dynatrace\oneagent\agent\lib64\oneagentloader.dll
+set DT_CUSTOM_PROP="%DT_CUSTOM_PROP% CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"
+`))
+				} else {
+					Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
 export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so
 export DT_LOGSTREAM=stdout
 export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"`))
+				}
 			})
 		})
 
@@ -393,23 +499,36 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 					"2": [{"name":"redis"}]
 				}`)
 
-				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/"+OSName+"/"+InstallationMethod+"/latest?bitness=64&include=nginx&include=process&include=dotnet",
 					api_header_check)
 			})
 
 			It("installs dynatrace", func() {
-				mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(runInstaller)
+				if runtime.GOOS != "windows" {
+					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
+				}
 
 				err = hook.AfterCompile(stager)
 				Expect(err).To(BeNil())
 
 				// Sets up profile.d
-				contents, err := ioutil.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", "dynatrace-env.sh"))
+				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
 				Expect(err).To(BeNil())
 
-				Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
+				if runtime.GOOS == "windows" {
+					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
+set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
+set DT_AGENTACTIVE=true
+set DT_BLOCKLIST=powershell*
+set COR_PROFILER_PATH_64=C:\users\vcap\app\dynatrace\oneagent\agent\lib64\oneagentloader.dll
+set DT_CUSTOM_PROP="%DT_CUSTOM_PROP% CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"
+`))
+				} else {
+					Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
 export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so
 export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"`))
+				}
+
 			})
 		})
 
@@ -422,24 +541,37 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 					"2": [{"name":"redis"}]
 				}`)
 
-				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/"+OSName+"/"+InstallationMethod+"/latest?bitness=64&include=nginx&include=process&include=dotnet",
 					api_header_check)
 			})
 
 			It("installs dynatrace", func() {
-				mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(runInstaller)
+				if runtime.GOOS != "windows" {
+					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
+				}
 
 				err = hook.AfterCompile(stager)
 				Expect(err).To(BeNil())
 
 				// Sets up profile.d
-				contents, err := ioutil.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", "dynatrace-env.sh"))
+				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
 				Expect(err).To(BeNil())
 
-				Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
+				if runtime.GOOS == "windows" {
+					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
+set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
+set DT_AGENTACTIVE=true
+set DT_BLOCKLIST=powershell*
+set COR_PROFILER_PATH_64=C:\users\vcap\app\dynatrace\oneagent\agent\lib64\oneagentloader.dll
+set DT_CUSTOM_PROP="%DT_CUSTOM_PROP% CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"
+`))
+				} else {
+					Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
 export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so
 export DT_LOGSTREAM=stdout
 export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"`))
+				}
+
 			})
 		})
 
@@ -452,26 +584,39 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 					"2": [{"name":"redis"}]
 				}`)
 
-				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/"+OSName+"/"+InstallationMethod+"/latest?bitness=64&include=nginx&include=process&include=dotnet",
 					api_header_check)
 
 				os.Remove(filepath.Join(bpDir, "VERSION"))
 			})
 
 			It("installs dynatrace", func() {
-				mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(runInstaller)
+				if runtime.GOOS != "windows" {
+					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
+				}
 
 				err = hook.AfterCompile(stager)
 				Expect(err).To(BeNil())
 
 				// Sets up profile.d
-				contents, err := ioutil.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", "dynatrace-env.sh"))
+				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
 				Expect(err).To(BeNil())
 
-				Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
+				if runtime.GOOS == "windows" {
+					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
+set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
+set DT_AGENTACTIVE=true
+set DT_BLOCKLIST=powershell*
+set COR_PROFILER_PATH_64=C:\users\vcap\app\dynatrace\oneagent\agent\lib64\oneagentloader.dll
+set DT_CUSTOM_PROP="%DT_CUSTOM_PROP% CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=unknown"
+`))
+				} else {
+					Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
 export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so
 export DT_LOGSTREAM=stdout
 export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=unknown"`))
+				}
+
 			})
 		})
 
@@ -484,24 +629,37 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 					"2": [{"name":"redis", "credentials":{"db_type":"redis", "instance_administration_api":{"deployment_id":"12345asdf", "instance_id":"12345asdf", "root":"https://doesnotexi.st"}}}]
 				}`)
 
-				httpmock.RegisterResponder("GET", "https://"+environmentID+".live.dynatrace.com/api/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
+				httpmock.RegisterResponder("GET", "https://"+environmentID+".live.dynatrace.com/api/v1/deployment/installer/agent/"+OSName+"/"+InstallationMethod+"/latest?bitness=64&include=nginx&include=process&include=dotnet",
 					api_header_check)
 			})
 
 			It("installs dynatrace", func() {
-				mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(runInstaller)
+				if runtime.GOOS != "windows" {
+					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
+				}
 
 				err = hook.AfterCompile(stager)
 				Expect(err).To(BeNil())
 
 				// Sets up profile.d
-				contents, err := ioutil.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", "dynatrace-env.sh"))
+				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
 				Expect(err).To(BeNil())
 
-				Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
+				if runtime.GOOS == "windows" {
+					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
+set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
+set DT_AGENTACTIVE=true
+set DT_BLOCKLIST=powershell*
+set COR_PROFILER_PATH_64=C:\users\vcap\app\dynatrace\oneagent\agent\lib64\oneagentloader.dll
+set DT_CUSTOM_PROP="%DT_CUSTOM_PROP% CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"
+`))
+				} else {
+					Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
 export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so
 export DT_LOGSTREAM=stdout
 export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"`))
+				}
+
 			})
 		})
 
@@ -517,12 +675,12 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				hook.MaxDownloadRetries = 1
 				attempt := 0
 
-				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/"+OSName+"/"+InstallationMethod+"/latest?bitness=64&include=nginx&include=process&include=dotnet",
 					func(req *http.Request) (*http.Response, error) {
 						if attempt += 1; attempt == 1 {
 							return httpmock.NewStringResponse(500, `{"error": "Server failure"}`), nil
 						}
-						return httpmock.NewStringResponse(200, "echo Install Dynatrace"), nil
+						return getMockResponse(), nil
 					})
 			})
 
@@ -531,19 +689,31 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 
 			It("installs dynatrace", func() {
-				mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(runInstaller)
+				if runtime.GOOS != "windows" {
+					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
+				}
 
 				err = hook.AfterCompile(stager)
 				Expect(err).To(BeNil())
 
 				// Sets up profile.d
-				contents, err := ioutil.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", "dynatrace-env.sh"))
+				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
 				Expect(err).To(BeNil())
 
-				Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
+				if runtime.GOOS == "windows" {
+					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
+set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
+set DT_AGENTACTIVE=true
+set DT_BLOCKLIST=powershell*
+set COR_PROFILER_PATH_64=C:\users\vcap\app\dynatrace\oneagent\agent\lib64\oneagentloader.dll
+set DT_CUSTOM_PROP="%DT_CUSTOM_PROP% CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"
+`))
+				} else {
+					Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
 export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so
 export DT_LOGSTREAM=stdout
 export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"`))
+				}
 			})
 		})
 
@@ -571,24 +741,37 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 					"0": [{"name":"dynatrace","credentials":{"apitoken":"`+apiToken+`","environmentid":"`+environmentID+`","networkzone":"west-us"}}]
 				}`)
 
-				httpmock.RegisterResponder("GET", "https://"+environmentID+".live.dynatrace.com/api/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet&networkZone=west-us",
+				httpmock.RegisterResponder("GET", "https://"+environmentID+".live.dynatrace.com/api/v1/deployment/installer/agent/"+OSName+"/"+InstallationMethod+"/latest?bitness=64&include=nginx&include=process&include=dotnet&networkZone=west-us",
 					api_header_check)
 			})
 
 			It("installs dynatrace", func() {
-				mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(runInstaller)
+				if runtime.GOOS != "windows" {
+					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
+				}
 
 				Expect(hook.AfterCompile(stager)).Should(Succeed())
 
 				// Sets up profile.d
-				contents, err := ioutil.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", "dynatrace-env.sh"))
+				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
 				Expect(err).Should(Succeed())
 
-				Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
+				if runtime.GOOS == "windows" {
+					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
+set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
+set DT_AGENTACTIVE=true
+set DT_BLOCKLIST=powershell*
+set COR_PROFILER_PATH_64=C:\users\vcap\app\dynatrace\oneagent\agent\lib64\oneagentloader.dll
+set DT_NETWORK_ZONE=west-us
+set DT_CUSTOM_PROP="%DT_CUSTOM_PROP% CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"
+`))
+				} else {
+					Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
 export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so
 export DT_NETWORK_ZONE=${DT_NETWORK_ZONE:-west-us}
 export DT_LOGSTREAM=stdout
 export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"`))
+				}
 			})
 		})
 
@@ -600,7 +783,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 					"0": [{"name":"dynatrace","credentials":{"environmentid":"`+environmentID+`","apitoken":"`+apiToken+`","skiperrors":"true"}}]
 				}`)
 
-				httpmock.RegisterResponder("GET", "https://"+environmentID+".live.dynatrace.com/api/v1/deployment/installer/agent/unix/paas-sh/latest?bitness=64&include=nginx&include=process&include=dotnet",
+				httpmock.RegisterResponder("GET", "https://"+environmentID+".live.dynatrace.com/api/v1/deployment/installer/agent/"+OSName+"/"+InstallationMethod+"/latest?bitness=64&include=nginx&include=process&include=dotnet",
 					httpmock.NewStringResponder(404, "echo agent not found"))
 			})
 
@@ -610,6 +793,36 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 
 				Expect(buffer.String()).To(ContainSubstring("Download returned with status 404"))
 				Expect(buffer.String()).To(ContainSubstring("Error during installer download, skipping installation"))
+			})
+		})
+
+		Context("FIPS enabled", func() {
+			BeforeEach(func() {
+				os.Setenv("BP_DEBUG", "true")
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Setenv("VCAP_SERVICES", `{
+					"0": [{"name":"mysql"}],
+					"1": [{"name":"dynatrace","credentials":{"apiurl":"https://example.com","apitoken":"`+apiToken+`","environmentid":"`+environmentID+`","enablefips":"true"}}],
+					"2": [{"name":"redis"}]
+				}`)
+
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/"+OSName+"/"+InstallationMethod+"/latest?bitness=64&include=nginx&include=process&include=dotnet",
+					api_header_check)
+
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/processmoduleconfig",
+					api_header_check)
+			})
+
+			It("installs dynatrace and deletes FIPS flag file", func() {
+				if runtime.GOOS != "windows" {
+					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
+				}
+
+				err = hook.AfterCompile(stager)
+				Expect(err).To(BeNil())
+
+				_, err := os.Stat(filepath.Join(buildDir, "agent/dt_fips_disabled.flag"))
+				Expect(err).To(Not(BeNil()))
 			})
 		})
 	})
