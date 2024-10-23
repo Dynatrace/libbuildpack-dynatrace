@@ -115,8 +115,8 @@ var _ = Describe("dynatraceHook", func() {
 
 		os.Setenv("DT_LOGSTREAM", "")
 
-		ioutil.WriteFile(filepath.Join(bpDir, "manifest.yml"), []byte("---\nlanguage: test42\n"), 0755)
-		ioutil.WriteFile(filepath.Join(bpDir, "VERSION"), []byte("1.2.3"), 0755)
+		os.WriteFile(filepath.Join(bpDir, "manifest.yml"), []byte("---\nlanguage: test42\n"), 0755)
+		os.WriteFile(filepath.Join(bpDir, "VERSION"), []byte("1.2.3"), 0755)
 
 		httpmock.Reset()
 
