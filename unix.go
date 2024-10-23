@@ -1,42 +1,29 @@
-//go:build !windows
-// +build !windows
-
 package dynatrace
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 
 	"github.com/cloudfoundry/libbuildpack"
 )
 
-func (h *Hook) downloadAndInstall(creds *credentials, ver string, lang string, installDir string, stager *libbuildpack.Stager) error {
-	installerFilePath := filepath.Join(os.TempDir(), "paasInstaller.sh")
-	url := h.getDownloadURL(creds, "unix", "paas-sh")
-
-	h.Log.Info("Downloading '%s' to '%s'", url, installerFilePath)
-	err := h.download(url, installerFilePath, ver, lang, creds)
+func (h *Hook) runInstallerUnix(installerFilePath, installDir string, creds *credentials, stager *libbuildpack.Stager) error {
+	h.Log.Debug("Making %s executable...", installerFilePath)
+	err := os.Chmod(installerFilePath, 0755)
 	if err != nil {
-		if creds.SkipErrors {
-			h.Log.Warning("Error during installer download, skipping installation")
-			return nil
-		}
+		h.Log.Error("Error while setting installer file %s executable", installerFilePath)
 		return err
 	}
 
-	// Run installer...
-
-	h.Log.Debug("Making %s executable...", installerFilePath)
-	os.Chmod(installerFilePath, 0755)
 
 	h.Log.BeginStep("Starting Dynatrace OneAgent installer")
 
 	if os.Getenv("BP_DEBUG") != "" {
 		err = h.Command.Execute("", os.Stdout, os.Stderr, installerFilePath, stager.BuildDir())
 	} else {
-		err = h.Command.Execute("", ioutil.Discard, ioutil.Discard, installerFilePath, stager.BuildDir())
+		err = h.Command.Execute("", io.Discard, io.Discard, installerFilePath, stager.BuildDir())
 	}
 	if err != nil {
 		return err
@@ -93,9 +80,13 @@ func (h *Hook) downloadAndInstall(creds *credentials, ver string, lang string, i
 		extra += "\nexport DT_LOGSTREAM=stdout"
 	}
 
+	ver, err := stager.BuildpackVersion()
+	if err != nil {
+		return err
+	}
 	h.Log.Debug("Preparing custom properties...")
 	extra += fmt.Sprintf(
-		"\nexport DT_CUSTOM_PROP=\"${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=%s CloudFoundryBuildpackVersion=%s\"", lang, ver)
+		"\nexport DT_CUSTOM_PROP=\"${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=%s CloudFoundryBuildpackVersion=%s\"", stager.BuildpackLanguage(), ver)
 
 	if _, err = f.WriteString(extra); err != nil {
 		return err

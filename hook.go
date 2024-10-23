@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"time"
 
@@ -34,6 +34,7 @@ type credentials struct {
 	SkipErrors        bool
 	NetworkZone       string
 	EnableFIPS        bool
+	Technologies      string
 }
 
 // Hook implements libbuildpack.Hook. It downloads and install the Dynatrace OneAgent.
@@ -79,23 +80,43 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 	h.Log.Info("Dynatrace service credentials found. Setting up Dynatrace OneAgent.")
 
 	// Get buildpack version and language
-
-	lang := stager.BuildpackLanguage()
-	ver, err := stager.BuildpackVersion()
-	if err != nil {
-		h.Log.Warning("Failed to get buildpack version: %v", err)
-		ver = "unknown"
+	// FIXME check again after refactoring
+	var technologies string
+	if creds.Technologies == "" {
+		technologies = stager.BuildpackLanguage()
+	} else {
+		technologies = creds.Technologies
 	}
 
 	installDir := filepath.Join("dynatrace", "oneagent")
-	err = h.downloadAndInstall(creds, ver, lang, installDir, stager)
+
+	// download installer
+	var installerFilename string
+	if runtime.GOOS == "linux" {
+		installerFilename = "paasInstaller.sh"
+	} else if runtime.GOOS == "windows" {
+		installerFilename = "paasInstaller.zip"
+	}
+
+	installerFilePath := filepath.Join(os.TempDir(), installerFilename)
+	url := h.getDownloadURL(creds, technologies)
+	err = h.download(url, installerFilePath, stager, creds)
 	if err != nil {
 		return err
 	}
+	// run installer
+	if runtime.GOOS == "linux" {
+		err = h.runInstallerUnix(installerFilePath, installDir, creds, stager)
+	} else if runtime.GOOS == "windows" {
+		err = h.runInstallerWindows(installerFilePath, installDir, creds, stager)
+	} else {
+		// fail because undefined
+	}
 
+	// update agent config
 	h.Log.Debug("Fetching updated OneAgent configuration from tenant... ")
 	configDir := filepath.Join(stager.BuildDir(), installDir)
-	if err := h.updateAgentConfig(creds, configDir, lang, ver); err != nil {
+	if err := h.updateAgentConfig(creds, configDir, stager); err != nil {
 		if creds.SkipErrors {
 			h.Log.Warning("Error during agent config update, skipping it")
 			return nil
@@ -157,6 +178,7 @@ func (h *Hook) getCredentials() *credentials {
 				SkipErrors:        queryString("skiperrors") == "true",
 				NetworkZone:       queryString("networkzone"),
 				EnableFIPS:        queryString("enablefips") == "true",
+				Technologies:      queryString("technologies"),
 			}
 
 			if (creds.EnvironmentID != "" && creds.APIToken != "") || creds.CustomOneAgentURL != "" {
@@ -181,13 +203,16 @@ func (h *Hook) getCredentials() *credentials {
 }
 
 // download gets url, and stores it as filePath, retrying a few more times if the downloads fail.
-func (h *Hook) download(url, filePath string, buildPackVersion string, language string, creds *credentials) error {
-	const baseWaitTime = 3 * time.Second
-
+func (h *Hook) download(url, filePath string, stager *libbuildpack.Stager, creds *credentials) error {
 	client := &http.Client{}
 	req, _ := http.NewRequest("GET", url, nil)
 	if creds.CustomOneAgentURL == "" {
-		req.Header.Set("User-Agent", fmt.Sprintf("cf-%s-buildpack/%s", language, buildPackVersion))
+		ver, err := stager.BuildpackVersion()
+			if err != nil {
+				h.Log.Warning("Failed to get buildpack version: %v", err)
+				ver = "unknown"
+			}
+		req.Header.Set("User-Agent", fmt.Sprintf("cf-%s-buildpack/%s", stager.BuildpackLanguage(), ver))
 		req.Header.Set("Authorization", fmt.Sprintf("Api-Token %s", creds.APIToken))
 	}
 
@@ -196,7 +221,8 @@ func (h *Hook) download(url, filePath string, buildPackVersion string, language 
 		return err
 	}
 	defer out.Close()
-
+	
+	const baseWaitTime = 3 * time.Second
 	for i := 0; ; i++ {
 		resp, err := client.Do(req)
 		if err == nil {
@@ -241,9 +267,24 @@ func (h *Hook) download(url, filePath string, buildPackVersion string, language 
 		h.Log.Warning("Error during installer download, retrying in %v", waitTime)
 		time.Sleep(waitTime)
 	}
+
+	//FIXME skiperrors handling missing!
 }
 
-func (h *Hook) getDownloadURL(c *credentials, osType string, installerType string) string {
+func (h *Hook) getDownloadURL(c *credentials, technologies string) string {
+//func (h *Hook) getDownloadURL(c *credentials, osType string, installerType string) string {
+
+	var osType, installerType string
+	if runtime.GOOS == "linux" {
+		osType = "unix"
+		installerType = "paas-sh"
+	} else if runtime.GOOS == "windows" {
+		osType = "windows"
+		installerType = "paas"
+	} else {
+		//fail because undefined
+	}
+
 	if c.CustomOneAgentURL != "" {
 		return c.CustomOneAgentURL
 	}
@@ -267,6 +308,7 @@ func (h *Hook) getDownloadURL(c *credentials, osType string, installerType strin
 	for _, t := range h.IncludeTechnologies {
 		qv.Add("include", t)
 	}
+	//qv.Add("include", technologies)
 	u.RawQuery = qv.Encode() // Parameters will be sorted by key.
 
 	return u.String()
@@ -320,7 +362,7 @@ func (h *Hook) findAgentPath(installDir string, technology string, binaryType st
 
 	var manifest Manifest
 
-	if raw, err := ioutil.ReadFile(manifestPath); err != nil {
+	if raw, err := os.ReadFile(manifestPath); err != nil {
 		return "", err
 	} else if err = json.Unmarshal(raw, &manifest); err != nil {
 		return "", err
@@ -339,7 +381,8 @@ func (h *Hook) findAgentPath(installDir string, technology string, binaryType st
 
 // Downloads most recent agent config from configuration API of the tenant
 // and merges it with the local version the standalone installer package brings along.
-func (h *Hook) updateAgentConfig(creds *credentials, installDir, buildPackLanguage, buildPackVersion string) error {
+func (h *Hook) updateAgentConfig(creds *credentials, installDir string, stager *libbuildpack.Stager) error {
+//func (h *Hook) updateAgentConfig(creds *credentials, installDir, buildPackLanguage, buildPackVersion string) error {
 	// agentConfigProperty represents a line of raw data we get from the config api
 	type agentConfigProperty struct {
 		Section string
@@ -363,9 +406,15 @@ func (h *Hook) updateAgentConfig(creds *credentials, installDir, buildPackLangua
 	}
 	agentConfigUrl := apiURL + "/v1/deployment/installer/agent/processmoduleconfig"
 
+	lang := stager.BuildpackLanguage()
+	ver, err := stager.BuildpackVersion()
+	if err != nil {
+		return err
+	}
+
 	h.Log.Debug("Downloading updated OneAgent config from %s", agentConfigUrl)
 	req, _ := http.NewRequest("GET", agentConfigUrl, nil)
-	req.Header.Set("User-Agent", fmt.Sprintf("cf-%s-buildpack/%s", buildPackLanguage, buildPackVersion))
+	req.Header.Set("User-Agent", fmt.Sprintf("cf-%s-buildpack/%s", lang, ver))
 	req.Header.Set("Authorization", fmt.Sprintf("Api-Token %s", creds.APIToken))
 	client.Do(req)
 	resp, err := client.Do(req)

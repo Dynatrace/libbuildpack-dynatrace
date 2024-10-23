@@ -1,6 +1,3 @@
-//go:build windows
-// +build windows
-
 package dynatrace
 
 import (
@@ -13,21 +10,7 @@ import (
 	"github.com/cloudfoundry/libbuildpack"
 )
 
-func (h *Hook) downloadAndInstall(creds *credentials, ver string, lang string, installDir string, stager *libbuildpack.Stager) error {
-	installerFilePath := filepath.Join(os.TempDir(), "paasInstaller.zip")
-	url := h.getDownloadURL(creds, "windows", "paas")
-
-	h.Log.Info("Downloading '%s' to '%s'", url, installerFilePath)
-	if err := h.download(url, installerFilePath, ver, lang, creds); err != nil {
-		if creds.SkipErrors {
-			h.Log.Warning("Error during installer download, skipping installation")
-			return nil
-		}
-		return err
-	}
-
-	// Do manual installation...
-
+func (h *Hook) runInstallerWindows(installerFilePath, installDir string, creds *credentials, stager *libbuildpack.Stager) error {
 	h.Log.BeginStep("Starting Dynatrace OneAgent installation")
 
 	h.Log.Info("Unzipping archive '%s' to '%s'", installerFilePath, filepath.Join(stager.BuildDir(), installDir))
@@ -43,7 +26,7 @@ func (h *Hook) downloadAndInstall(creds *credentials, ver string, lang string, i
 
 	h.Log.BeginStep("Setting up Dynatrace OneAgent injection...")
 	if slices.Contains(h.IncludeTechnologies, "dotnet") {
-		err = h.setUpDotNetCorProfilerInjection(creds, ver, lang, installDir, stager)
+		err = h.setUpDotNetCorProfilerInjection(creds, installDir, stager)
 	} else {
 		h.Log.Warning("No injection method available for technology stack")
 		return nil
@@ -55,7 +38,7 @@ func (h *Hook) downloadAndInstall(creds *credentials, ver string, lang string, i
 	return nil
 }
 
-func (h *Hook) setUpDotNetCorProfilerInjection(creds *credentials, ver string, lang string, installDir string, stager *libbuildpack.Stager) error {
+func (h *Hook) setUpDotNetCorProfilerInjection(creds *credentials, installDir string, stager *libbuildpack.Stager) error {
 	loaderPath, err := h.findAbsoluteLoaderPath(stager, installDir)
 	if err != nil {
 		return fmt.Errorf("cannot find oneagentloader.dll: %s", err)
@@ -72,8 +55,12 @@ func (h *Hook) setUpDotNetCorProfilerInjection(creds *credentials, ver string, l
 		scriptContent += "set DT_NETWORK_ZONE=" + creds.NetworkZone + "\n"
 	}
 
+	ver, err := stager.BuildpackVersion()
+	if err != nil {
+		return nil
+	}
 	h.Log.Debug("Preparing custom properties...")
-	scriptContent += fmt.Sprintf("set DT_CUSTOM_PROP=\"%%DT_CUSTOM_PROP%% CloudFoundryBuildpackLanguage=%s CloudFoundryBuildpackVersion=%s\"\n", lang, ver)
+	scriptContent += fmt.Sprintf("set DT_CUSTOM_PROP=\"%%DT_CUSTOM_PROP%% CloudFoundryBuildpackLanguage=%s CloudFoundryBuildpackVersion=%s\"\n", stager.BuildpackLanguage(), ver)
 
 	stager.WriteProfileD("dynatrace-env.cmd", scriptContent)
 
