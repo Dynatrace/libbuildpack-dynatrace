@@ -101,9 +101,13 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 	installerFilePath := filepath.Join(os.TempDir(), installerFilename)
 	url := h.getDownloadURL(creds, technologies)
 	err = h.download(url, installerFilePath, stager, creds)
-	if err != nil {
+	if err != nil && creds.SkipErrors {
+		h.Log.Warning("Error during installer download, skipping installation")
+		return nil
+	}else if err != nil {
 		return err
 	}
+
 	// run installer
 	if runtime.GOOS == "linux" {
 		err = h.runInstallerUnix(installerFilePath, installDir, creds, stager)
@@ -268,7 +272,6 @@ func (h *Hook) download(url, filePath string, stager *libbuildpack.Stager, creds
 		time.Sleep(waitTime)
 	}
 
-	//FIXME skiperrors handling missing!
 }
 
 func (h *Hook) getDownloadURL(c *credentials, technologies string) string {
