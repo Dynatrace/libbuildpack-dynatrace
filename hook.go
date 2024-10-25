@@ -412,7 +412,8 @@ func (h *Hook) updateAgentConfig(creds *credentials, installDir string, stager *
 	lang := stager.BuildpackLanguage()
 	ver, err := stager.BuildpackVersion()
 	if err != nil {
-		return err
+		h.Log.Warning("Failed to get buildpack version: %v", err)
+		ver = "unknown"
 	}
 
 	h.Log.Debug("Downloading updated OneAgent config from %s", agentConfigUrl)

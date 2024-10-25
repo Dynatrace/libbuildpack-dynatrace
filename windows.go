@@ -57,7 +57,8 @@ func (h *Hook) setUpDotNetCorProfilerInjection(creds *credentials, installDir st
 
 	ver, err := stager.BuildpackVersion()
 	if err != nil {
-		return nil
+		h.Log.Warning("Failed to get buildpack version: %v", err)
+		ver = "unknown"
 	}
 	h.Log.Debug("Preparing custom properties...")
 	scriptContent += fmt.Sprintf("set DT_CUSTOM_PROP=\"%%DT_CUSTOM_PROP%% CloudFoundryBuildpackLanguage=%s CloudFoundryBuildpackVersion=%s\"\n", stager.BuildpackLanguage(), ver)

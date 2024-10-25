@@ -82,7 +82,8 @@ func (h *Hook) runInstallerUnix(installerFilePath, installDir string, creds *cre
 
 	ver, err := stager.BuildpackVersion()
 	if err != nil {
-		return err
+		h.Log.Warning("Failed to get buildpack version: %v", err)
+		ver = "unknown"
 	}
 	h.Log.Debug("Preparing custom properties...")
 	extra += fmt.Sprintf(
