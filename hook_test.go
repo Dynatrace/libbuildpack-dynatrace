@@ -75,13 +75,13 @@ var _ = Describe("dynatraceHook", func() {
 	)
 
 	BeforeEach(func() {
-		bpDir, err = ioutil.TempDir("", "libbuildpack-dynatrace.buildpack.")
+		bpDir, err = os.MkdirTemp("", "libbuildpack-dynatrace.buildpack.")
 		Expect(err).To(BeNil())
 
-		buildDir, err = ioutil.TempDir("", "libbuildpack-dynatrace.build.")
+		buildDir, err = os.MkdirTemp("", "libbuildpack-dynatrace.build.")
 		Expect(err).To(BeNil())
 
-		depsDir, err = ioutil.TempDir("", "libbuildpack-dynatrace.deps.")
+		depsDir, err = os.MkdirTemp("", "libbuildpack-dynatrace.deps.")
 		Expect(err).To(BeNil())
 
 		depsIdx = "07"
@@ -129,13 +129,13 @@ var _ = Describe("dynatraceHook", func() {
 			err = os.MkdirAll(filepath.Join(buildDir, "dynatrace/oneagent/agent/lib64"), 0755)
 			Expect(err).To(BeNil())
 
-			err = ioutil.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/agent/lib64/liboneagentproc.so"), []byte("library"), 0644)
+			err = os.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/agent/lib64/liboneagentproc.so"), []byte("library"), 0644)
 			Expect(err).To(BeNil())
 
-			err = ioutil.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/dynatrace-env.sh"), []byte("echo running dynatrace-env.sh"), 0644)
+			err = os.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/dynatrace-env.sh"), []byte("echo running dynatrace-env.sh"), 0644)
 			Expect(err).To(BeNil())
 
-			err = ioutil.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/manifest.json"), []byte(manifestJson), 0664)
+			err = os.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/manifest.json"), []byte(manifestJson), 0664)
 			Expect(err).To(BeNil())
 
 			ruxitagentproc := `
@@ -150,10 +150,10 @@ var _ = Describe("dynatraceHook", func() {
 			err = os.MkdirAll(filepath.Join(buildDir, "dynatrace/oneagent/agent/conf"), 0755)
 			Expect(err).To(BeNil())
 
-			err = ioutil.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/agent/conf/ruxitagentproc.conf"), []byte(ruxitagentproc), 0664)
+			err = os.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/agent/conf/ruxitagentproc.conf"), []byte(ruxitagentproc), 0664)
 			Expect(err).To(BeNil())
 
-			err = ioutil.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/agent/dt_fips_disabled.flag"), []byte(""), 0664)
+			err = os.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/agent/dt_fips_disabled.flag"), []byte(""), 0664)
 			Expect(err).To(BeNil())
 		}
 	})
