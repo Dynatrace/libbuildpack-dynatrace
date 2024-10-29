@@ -3,7 +3,6 @@ package dynatrace_test
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
