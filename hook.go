@@ -34,7 +34,7 @@ type credentials struct {
 	SkipErrors        bool
 	NetworkZone       string
 	EnableFIPS        bool
-	Technologies      string
+	AddTechnologies   string
 }
 
 // Hook implements libbuildpack.Hook. It downloads and install the Dynatrace OneAgent.
@@ -81,11 +81,9 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 
 	// Get buildpack version and language
 	// FIXME check again after refactoring
-	var technologies string
-	if creds.Technologies == "" {
-		technologies = stager.BuildpackLanguage()
-	} else {
-		technologies = creds.Technologies
+	var addTechnologies string
+	if creds.AddTechnologies != "" {
+		addTechnologies = creds.AddTechnologies
 	}
 
 	installDir := filepath.Join("dynatrace", "oneagent")
@@ -99,7 +97,7 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 	}
 
 	installerFilePath := filepath.Join(os.TempDir(), installerFilename)
-	url := h.getDownloadURL(creds, technologies)
+	url := h.getDownloadURL(creds, addTechnologies)
 	err = h.download(url, installerFilePath, stager, creds)
 	if err != nil && creds.SkipErrors {
 		h.Log.Warning("Error during installer download, skipping installation")
@@ -182,7 +180,7 @@ func (h *Hook) getCredentials() *credentials {
 				SkipErrors:        queryString("skiperrors") == "true",
 				NetworkZone:       queryString("networkzone"),
 				EnableFIPS:        queryString("enablefips") == "true",
-				Technologies:      queryString("technologies"),
+				AddTechnologies:      queryString("addTechnologies"),
 			}
 
 			if (creds.EnvironmentID != "" && creds.APIToken != "") || creds.CustomOneAgentURL != "" {
@@ -274,7 +272,7 @@ func (h *Hook) download(url, filePath string, stager *libbuildpack.Stager, creds
 
 }
 
-func (h *Hook) getDownloadURL(c *credentials, technologies string) string {
+func (h *Hook) getDownloadURL(c *credentials, addTechnologies string) string {
 //func (h *Hook) getDownloadURL(c *credentials, osType string, installerType string) string {
 
 	var osType, installerType string
@@ -311,7 +309,12 @@ func (h *Hook) getDownloadURL(c *credentials, technologies string) string {
 	for _, t := range h.IncludeTechnologies {
 		qv.Add("include", t)
 	}
-	//qv.Add("include", technologies)
+	if addTechnologies != "" {
+		// add optionally configured OneAgent code modules
+		for _, t := range strings.Split(addTechnologies, ",") {
+			qv.Add("include", t)
+		}
+	}
 	u.RawQuery = qv.Encode() // Parameters will be sorted by key.
 
 	return u.String()
