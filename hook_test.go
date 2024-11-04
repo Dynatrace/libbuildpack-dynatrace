@@ -824,6 +824,33 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				Expect(err).To(Not(BeNil()))
 			})
 		})
+
+		Context("Additional code modules configured", func() {
+			BeforeEach(func() {
+				os.Setenv("BP_DEBUG", "true")
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Setenv("VCAP_SERVICES", `{
+					"0": [{"name":"dynatrace","credentials":{"apiurl":"https://example.com","apitoken":"`+apiToken+`","environmentid":"`+environmentID+`","addtechnologies":"go,nodejs"}}]
+				}`)
+
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/"+OSName+"/"+InstallationMethod+"/latest?bitness=64&include=nginx&include=process&include=dotnet&include=go&include=nodejs",
+					api_header_check)
+
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/processmoduleconfig",
+					api_header_check)
+			})
+
+			It("installs dynatrace with additional code modules", func() {
+				if runtime.GOOS != "windows" {
+					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
+				}
+				err = hook.AfterCompile(stager)
+				Expect(err).To(BeNil())
+
+				Expect(buffer.String()).To(ContainSubstring("Adding additional code module to download: go"))
+				Expect(buffer.String()).To(ContainSubstring("Adding additional code module to download: nodejs"))
+			})
+		})
 	})
 })
 

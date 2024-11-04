@@ -304,6 +304,7 @@ func (h *Hook) getDownloadURL(c *credentials) string {
 	if c.AddTechnologies != "" {
 		// add optionally configured OneAgent code modules
 		for _, t := range strings.Split(c.AddTechnologies, ",") {
+			h.Log.Debug("Adding additional code module to download: %s", t)
 			qv.Add("include", t)
 		}
 	}
