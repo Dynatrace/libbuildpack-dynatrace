@@ -3,6 +3,7 @@ package dynatrace
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -79,13 +80,6 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 
 	h.Log.Info("Dynatrace service credentials found. Setting up Dynatrace OneAgent.")
 
-	// Get buildpack version and language
-	// FIXME check again after refactoring
-	var addTechnologies string
-	if creds.AddTechnologies != "" {
-		addTechnologies = creds.AddTechnologies
-	}
-
 	installDir := filepath.Join("dynatrace", "oneagent")
 
 	// download installer
@@ -94,10 +88,14 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 		installerFilename = "paasInstaller.sh"
 	} else if runtime.GOOS == "windows" {
 		installerFilename = "paasInstaller.zip"
+	} else {
+		// This is the only place where we need to return an error.
+		// All following operating system checks are just to determine installation specifics.
+		return errors.New("libbuildpack-dynatrace: Unsupported operating system: " + runtime.GOOS)
 	}
 
 	installerFilePath := filepath.Join(os.TempDir(), installerFilename)
-	url := h.getDownloadURL(creds, addTechnologies)
+	url := h.getDownloadURL(creds)
 	err = h.download(url, installerFilePath, stager, creds)
 	if err != nil && creds.SkipErrors {
 		h.Log.Warning("Error during installer download, skipping installation")
@@ -111,8 +109,6 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 		err = h.runInstallerUnix(installerFilePath, installDir, creds, stager)
 	} else if runtime.GOOS == "windows" {
 		err = h.runInstallerWindows(installerFilePath, installDir, creds, stager)
-	} else {
-		// fail because undefined
 	}
 
 	// update agent config
@@ -180,7 +176,7 @@ func (h *Hook) getCredentials() *credentials {
 				SkipErrors:        queryString("skiperrors") == "true",
 				NetworkZone:       queryString("networkzone"),
 				EnableFIPS:        queryString("enablefips") == "true",
-				AddTechnologies:      queryString("addTechnologies"),
+				AddTechnologies:      queryString("addtechnologies"),
 			}
 
 			if (creds.EnvironmentID != "" && creds.APIToken != "") || creds.CustomOneAgentURL != "" {
@@ -272,9 +268,7 @@ func (h *Hook) download(url, filePath string, stager *libbuildpack.Stager, creds
 
 }
 
-func (h *Hook) getDownloadURL(c *credentials, addTechnologies string) string {
-//func (h *Hook) getDownloadURL(c *credentials, osType string, installerType string) string {
-
+func (h *Hook) getDownloadURL(c *credentials) string {
 	var osType, installerType string
 	if runtime.GOOS == "linux" {
 		osType = "unix"
@@ -282,8 +276,6 @@ func (h *Hook) getDownloadURL(c *credentials, addTechnologies string) string {
 	} else if runtime.GOOS == "windows" {
 		osType = "windows"
 		installerType = "paas"
-	} else {
-		//fail because undefined
 	}
 
 	if c.CustomOneAgentURL != "" {
@@ -309,9 +301,9 @@ func (h *Hook) getDownloadURL(c *credentials, addTechnologies string) string {
 	for _, t := range h.IncludeTechnologies {
 		qv.Add("include", t)
 	}
-	if addTechnologies != "" {
+	if c.AddTechnologies != "" {
 		// add optionally configured OneAgent code modules
-		for _, t := range strings.Split(addTechnologies, ",") {
+		for _, t := range strings.Split(c.AddTechnologies, ",") {
 			qv.Add("include", t)
 		}
 	}
@@ -388,7 +380,6 @@ func (h *Hook) findAgentPath(installDir string, technology string, binaryType st
 // Downloads most recent agent config from configuration API of the tenant
 // and merges it with the local version the standalone installer package brings along.
 func (h *Hook) updateAgentConfig(creds *credentials, installDir string, stager *libbuildpack.Stager) error {
-//func (h *Hook) updateAgentConfig(creds *credentials, installDir, buildPackLanguage, buildPackVersion string) error {
 	// agentConfigProperty represents a line of raw data we get from the config api
 	type agentConfigProperty struct {
 		Section string
