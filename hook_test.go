@@ -3,7 +3,6 @@ package dynatrace_test
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -75,13 +74,13 @@ var _ = Describe("dynatraceHook", func() {
 	)
 
 	BeforeEach(func() {
-		bpDir, err = ioutil.TempDir("", "libbuildpack-dynatrace.buildpack.")
+		bpDir, err = os.MkdirTemp("", "libbuildpack-dynatrace.buildpack.")
 		Expect(err).To(BeNil())
 
-		buildDir, err = ioutil.TempDir("", "libbuildpack-dynatrace.build.")
+		buildDir, err = os.MkdirTemp("", "libbuildpack-dynatrace.build.")
 		Expect(err).To(BeNil())
 
-		depsDir, err = ioutil.TempDir("", "libbuildpack-dynatrace.deps.")
+		depsDir, err = os.MkdirTemp("", "libbuildpack-dynatrace.deps.")
 		Expect(err).To(BeNil())
 
 		depsIdx = "07"
@@ -115,8 +114,8 @@ var _ = Describe("dynatraceHook", func() {
 
 		os.Setenv("DT_LOGSTREAM", "")
 
-		ioutil.WriteFile(filepath.Join(bpDir, "manifest.yml"), []byte("---\nlanguage: test42\n"), 0755)
-		ioutil.WriteFile(filepath.Join(bpDir, "VERSION"), []byte("1.2.3"), 0755)
+		os.WriteFile(filepath.Join(bpDir, "manifest.yml"), []byte("---\nlanguage: test42\n"), 0755)
+		os.WriteFile(filepath.Join(bpDir, "VERSION"), []byte("1.2.3"), 0755)
 
 		httpmock.Reset()
 
@@ -129,13 +128,13 @@ var _ = Describe("dynatraceHook", func() {
 			err = os.MkdirAll(filepath.Join(buildDir, "dynatrace/oneagent/agent/lib64"), 0755)
 			Expect(err).To(BeNil())
 
-			err = ioutil.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/agent/lib64/liboneagentproc.so"), []byte("library"), 0644)
+			err = os.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/agent/lib64/liboneagentproc.so"), []byte("library"), 0644)
 			Expect(err).To(BeNil())
 
-			err = ioutil.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/dynatrace-env.sh"), []byte("echo running dynatrace-env.sh"), 0644)
+			err = os.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/dynatrace-env.sh"), []byte("echo running dynatrace-env.sh"), 0644)
 			Expect(err).To(BeNil())
 
-			err = ioutil.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/manifest.json"), []byte(manifestJson), 0664)
+			err = os.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/manifest.json"), []byte(manifestJson), 0664)
 			Expect(err).To(BeNil())
 
 			ruxitagentproc := `
@@ -150,10 +149,10 @@ var _ = Describe("dynatraceHook", func() {
 			err = os.MkdirAll(filepath.Join(buildDir, "dynatrace/oneagent/agent/conf"), 0755)
 			Expect(err).To(BeNil())
 
-			err = ioutil.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/agent/conf/ruxitagentproc.conf"), []byte(ruxitagentproc), 0664)
+			err = os.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/agent/conf/ruxitagentproc.conf"), []byte(ruxitagentproc), 0664)
 			Expect(err).To(BeNil())
 
-			err = ioutil.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/agent/dt_fips_disabled.flag"), []byte(""), 0664)
+			err = os.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/agent/dt_fips_disabled.flag"), []byte(""), 0664)
 			Expect(err).To(BeNil())
 		}
 	})
@@ -823,6 +822,33 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 
 				_, err := os.Stat(filepath.Join(buildDir, "agent/dt_fips_disabled.flag"))
 				Expect(err).To(Not(BeNil()))
+			})
+		})
+
+		Context("Additional code modules configured", func() {
+			BeforeEach(func() {
+				os.Setenv("BP_DEBUG", "true")
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Setenv("VCAP_SERVICES", `{
+					"0": [{"name":"dynatrace","credentials":{"apiurl":"https://example.com","apitoken":"`+apiToken+`","environmentid":"`+environmentID+`","addtechnologies":"go,nodejs"}}]
+				}`)
+
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/"+OSName+"/"+InstallationMethod+"/latest?bitness=64&include=nginx&include=process&include=dotnet&include=go&include=nodejs",
+					api_header_check)
+
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/processmoduleconfig",
+					api_header_check)
+			})
+
+			It("installs dynatrace with additional code modules", func() {
+				if runtime.GOOS != "windows" {
+					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
+				}
+				err = hook.AfterCompile(stager)
+				Expect(err).To(BeNil())
+
+				Expect(buffer.String()).To(ContainSubstring("Adding additional code module to download: go"))
+				Expect(buffer.String()).To(ContainSubstring("Adding additional code module to download: nodejs"))
 			})
 		})
 	})
