@@ -19,7 +19,7 @@ const InstallationMethod = "paas"
 func getMockResponse() *http.Response {
 	var zipBytes bytes.Buffer
 	zipWriter := zip.NewWriter(bufio.NewWriter(&zipBytes))
-	writer, _ := zipWriter.Create("agent/lib64/oneagentloader.dll")
+	writer, _ := zipWriter.Create("agent/bin/current/windows-x86-64/oneagentdotnet.dll")
 	writer.Write([]byte("library"))
 	writer, _ = zipWriter.Create("agent/conf/ruxitagentproc.conf")
 	writer.Write([]byte("library"))
