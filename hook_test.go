@@ -44,10 +44,10 @@ const manifestJson = `{
 					"version" : "1.130.0.20170914-125024"
 				},  
 				{
-					"path" : "agent/lib64/oneagentloader.dll",
+					"path" : "agent/bin/current/windows-x86-64/oneagentdotnet.dll",
 					"md5" : "2bf4ba9e90e2589428f6f6f3a964cba2",
 					"version" : "1.130.0.20170914-125024",
-					"binarytype" : "loader"
+					"binarytype" : "primary"
 				}
 			]
 		}
@@ -319,7 +319,7 @@ var _ = Describe("dynatraceHook", func() {
 set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
 set DT_AGENTACTIVE=true
 set DT_BLOCKLIST=powershell*
-set COR_PROFILER_PATH_64=C:\users\vcap\app\dynatrace\oneagent\agent\lib64\oneagentloader.dll
+set COR_PROFILER_PATH_64=C:\users\vcap\app\dynatrace\oneagent\agent\bin\current\windows-x86-64\oneagentdotnet.dll
 set DT_CUSTOM_PROP="%DT_CUSTOM_PROP% CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"
 `))
 				} else {
@@ -367,7 +367,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
 set DT_AGENTACTIVE=true
 set DT_BLOCKLIST=powershell*
-set COR_PROFILER_PATH_64=C:\users\vcap\app\dynatrace\oneagent\agent\lib64\oneagentloader.dll
+set COR_PROFILER_PATH_64=C:\users\vcap\app\dynatrace\oneagent\agent\bin\current\windows-x86-64\oneagentdotnet.dll
 set DT_CUSTOM_PROP="%DT_CUSTOM_PROP% CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"
 `))
 				} else {
@@ -421,7 +421,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
 set DT_AGENTACTIVE=true
 set DT_BLOCKLIST=powershell*
-set COR_PROFILER_PATH_64=C:\users\vcap\app\dynatrace\oneagent\agent\lib64\oneagentloader.dll
+set COR_PROFILER_PATH_64=C:\users\vcap\app\dynatrace\oneagent\agent\bin\current\windows-x86-64\oneagentdotnet.dll
 set DT_CUSTOM_PROP="%DT_CUSTOM_PROP% CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"
 `))
 				} else {
@@ -476,7 +476,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
 set DT_AGENTACTIVE=true
 set DT_BLOCKLIST=powershell*
-set COR_PROFILER_PATH_64=C:\users\vcap\app\dynatrace\oneagent\agent\lib64\oneagentloader.dll
+set COR_PROFILER_PATH_64=C:\users\vcap\app\dynatrace\oneagent\agent\bin\current\windows-x86-64\oneagentdotnet.dll
 set DT_CUSTOM_PROP="%DT_CUSTOM_PROP% CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"
 `))
 				} else {
@@ -519,7 +519,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
 set DT_AGENTACTIVE=true
 set DT_BLOCKLIST=powershell*
-set COR_PROFILER_PATH_64=C:\users\vcap\app\dynatrace\oneagent\agent\lib64\oneagentloader.dll
+set COR_PROFILER_PATH_64=C:\users\vcap\app\dynatrace\oneagent\agent\bin\current\windows-x86-64\oneagentdotnet.dll
 set DT_CUSTOM_PROP="%DT_CUSTOM_PROP% CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"
 `))
 				} else {
@@ -561,7 +561,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
 set DT_AGENTACTIVE=true
 set DT_BLOCKLIST=powershell*
-set COR_PROFILER_PATH_64=C:\users\vcap\app\dynatrace\oneagent\agent\lib64\oneagentloader.dll
+set COR_PROFILER_PATH_64=C:\users\vcap\app\dynatrace\oneagent\agent\bin\current\windows-x86-64\oneagentdotnet.dll
 set DT_CUSTOM_PROP="%DT_CUSTOM_PROP% CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"
 `))
 				} else {
@@ -606,7 +606,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
 set DT_AGENTACTIVE=true
 set DT_BLOCKLIST=powershell*
-set COR_PROFILER_PATH_64=C:\users\vcap\app\dynatrace\oneagent\agent\lib64\oneagentloader.dll
+set COR_PROFILER_PATH_64=C:\users\vcap\app\dynatrace\oneagent\agent\bin\current\windows-x86-64\oneagentdotnet.dll
 set DT_CUSTOM_PROP="%DT_CUSTOM_PROP% CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=unknown"
 `))
 				} else {
@@ -649,7 +649,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
 set DT_AGENTACTIVE=true
 set DT_BLOCKLIST=powershell*
-set COR_PROFILER_PATH_64=C:\users\vcap\app\dynatrace\oneagent\agent\lib64\oneagentloader.dll
+set COR_PROFILER_PATH_64=C:\users\vcap\app\dynatrace\oneagent\agent\bin\current\windows-x86-64\oneagentdotnet.dll
 set DT_CUSTOM_PROP="%DT_CUSTOM_PROP% CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"
 `))
 				} else {
@@ -704,7 +704,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
 set DT_AGENTACTIVE=true
 set DT_BLOCKLIST=powershell*
-set COR_PROFILER_PATH_64=C:\users\vcap\app\dynatrace\oneagent\agent\lib64\oneagentloader.dll
+set COR_PROFILER_PATH_64=C:\users\vcap\app\dynatrace\oneagent\agent\bin\current\windows-x86-64\oneagentdotnet.dll
 set DT_CUSTOM_PROP="%DT_CUSTOM_PROP% CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"
 `))
 				} else {
@@ -760,7 +760,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
 set DT_AGENTACTIVE=true
 set DT_BLOCKLIST=powershell*
-set COR_PROFILER_PATH_64=C:\users\vcap\app\dynatrace\oneagent\agent\lib64\oneagentloader.dll
+set COR_PROFILER_PATH_64=C:\users\vcap\app\dynatrace\oneagent\agent\bin\current\windows-x86-64\oneagentdotnet.dll
 set DT_NETWORK_ZONE=west-us
 set DT_CUSTOM_PROP="%DT_CUSTOM_PROP% CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"
 `))
