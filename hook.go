@@ -100,7 +100,7 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 	if err != nil && creds.SkipErrors {
 		h.Log.Warning("Error during installer download, skipping installation")
 		return nil
-	}else if err != nil {
+	} else if err != nil {
 		return err
 	}
 
@@ -137,9 +137,48 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 	return nil
 }
 
+// loadVCAPServicesData returns the raw VCAP_SERVICES JSON data from the appropriate source.
+// If VCAP_SERVICES_FILE_PATH is set to a non-empty value, the file is read and returned.
+// If VCAP_SERVICES_FILE_PATH is set but empty, a warning is logged and the VCAP_SERVICES
+// environment variable is used as a fallback.
+// If VCAP_SERVICES_FILE_PATH is not set, the VCAP_SERVICES environment variable is used.
+// Returns nil if no data is available from any source.
+func (h *Hook) loadVCAPServicesData() []byte {
+	filePath, filePathSet := os.LookupEnv("VCAP_SERVICES_FILE_PATH")
+
+	if filePathSet {
+		if filePath == "" {
+			h.Log.Warning("VCAP_SERVICES_FILE_PATH is set but empty, falling back to VCAP_SERVICES environment variable")
+		} else {
+			if os.Getenv("VCAP_SERVICES") != "" {
+				h.Log.Warning("Both VCAP_SERVICES_FILE_PATH and VCAP_SERVICES are set, using file: %s", filePath)
+			}
+			data, err := os.ReadFile(filePath)
+			if err != nil {
+				h.Log.Error("Failed to read VCAP services file %s: %s", filePath, err)
+				return nil
+			}
+			h.Log.Debug("Loading VCAP services from file: %s", filePath)
+			return data
+		}
+	}
+
+	envData := os.Getenv("VCAP_SERVICES")
+	if envData == "" {
+		return nil
+	}
+	h.Log.Debug("Loading VCAP services from environment variable VCAP_SERVICES")
+	return []byte(envData)
+}
+
 // getCredentials returns the configuration from the environment, or nil if not found. The credentials are represented
-// as a JSON object in the VCAP_SERVICES environment variable.
+// as a JSON object loaded via loadVCAPServicesData.
 func (h *Hook) getCredentials() *credentials {
+	data := h.loadVCAPServicesData()
+	if data == nil {
+		return nil
+	}
+
 	// Represent the structure of the JSON object in VCAP_SERVICES for parsing.
 
 	var vcapServices map[string][]struct {
@@ -147,7 +186,7 @@ func (h *Hook) getCredentials() *credentials {
 		Credentials map[string]interface{} `json:"credentials"`
 	}
 
-	if err := json.Unmarshal([]byte(os.Getenv("VCAP_SERVICES")), &vcapServices); err != nil {
+	if err := json.Unmarshal(data, &vcapServices); err != nil {
 		h.Log.Debug("Failed to unmarshal VCAP_SERVICES: %s", err)
 		return nil
 	}
@@ -176,7 +215,7 @@ func (h *Hook) getCredentials() *credentials {
 				SkipErrors:        queryString("skiperrors") == "true",
 				NetworkZone:       queryString("networkzone"),
 				EnableFIPS:        queryString("enablefips") == "true",
-				AddTechnologies:      queryString("addtechnologies"),
+				AddTechnologies:   queryString("addtechnologies"),
 			}
 
 			if (creds.EnvironmentID != "" && creds.APIToken != "") || creds.CustomOneAgentURL != "" {
@@ -206,10 +245,10 @@ func (h *Hook) download(url, filePath string, stager *libbuildpack.Stager, creds
 	req, _ := http.NewRequest("GET", url, nil)
 	if creds.CustomOneAgentURL == "" {
 		ver, err := stager.BuildpackVersion()
-			if err != nil {
-				h.Log.Warning("Failed to get buildpack version: %v", err)
-				ver = "unknown"
-			}
+		if err != nil {
+			h.Log.Warning("Failed to get buildpack version: %v", err)
+			ver = "unknown"
+		}
 		req.Header.Set("User-Agent", fmt.Sprintf("cf-%s-buildpack/%s", stager.BuildpackLanguage(), ver))
 		req.Header.Set("Authorization", fmt.Sprintf("Api-Token %s", creds.APIToken))
 	}
@@ -219,7 +258,7 @@ func (h *Hook) download(url, filePath string, stager *libbuildpack.Stager, creds
 		return err
 	}
 	defer out.Close()
-	
+
 	const baseWaitTime = 3 * time.Second
 	for i := 0; ; i++ {
 		resp, err := client.Do(req)

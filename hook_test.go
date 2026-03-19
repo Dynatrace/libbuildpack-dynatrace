@@ -181,9 +181,10 @@ var _ = Describe("dynatraceHook", func() {
 
 	Describe("AfterCompile", func() {
 		var (
-			oldVcapApplication string
-			oldVcapServices    string
-			oldBpDebug         string
+			oldVcapApplication  string
+			oldVcapServices     string
+			oldBpDebug          string
+			oldVcapServicesFile string
 
 			environmentID string
 			apiToken      string
@@ -192,6 +193,8 @@ var _ = Describe("dynatraceHook", func() {
 			oldVcapApplication = os.Getenv("VCAP_APPLICATION")
 			oldVcapServices = os.Getenv("VCAP_SERVICES")
 			oldBpDebug = os.Getenv("BP_DEBUG")
+			oldVcapServicesFile = os.Getenv("VCAP_SERVICES_FILE_PATH")
+			os.Unsetenv("VCAP_SERVICES_FILE_PATH")
 			environmentID = "123456"
 			apiToken = "ExcitingToken28"
 		})
@@ -199,6 +202,11 @@ var _ = Describe("dynatraceHook", func() {
 			os.Setenv("VCAP_APPLICATION", oldVcapApplication)
 			os.Setenv("VCAP_SERVICES", oldVcapServices)
 			os.Setenv("BP_DEBUG", oldBpDebug)
+			if oldVcapServicesFile != "" {
+				os.Setenv("VCAP_SERVICES_FILE_PATH", oldVcapServicesFile)
+			} else {
+				os.Unsetenv("VCAP_SERVICES_FILE_PATH")
+			}
 		})
 
 		Context("VCAP_SERVICES is empty", func() {
@@ -849,6 +857,190 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 
 				Expect(buffer.String()).To(ContainSubstring("Adding additional code module to download: go"))
 				Expect(buffer.String()).To(ContainSubstring("Adding additional code module to download: nodejs"))
+			})
+		})
+
+		Context("VCAP_SERVICES_FILE_PATH points to valid file with dynatrace service", func() {
+			var vcapFile string
+
+			BeforeEach(func() {
+				os.Setenv("BP_DEBUG", "true")
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Setenv("VCAP_SERVICES", "{}")
+
+				vcapContent := `{
+					"0": [{"name":"mysql"}],
+					"1": [{"name":"dynatrace","credentials":{"apiurl":"https://example.com","apitoken":"` + apiToken + `","environmentid":"` + environmentID + `"}}],
+					"2": [{"name":"redis"}]
+				}`
+
+				vcapFile = filepath.Join(buildDir, "vcap_services.json")
+				err = os.WriteFile(vcapFile, []byte(vcapContent), 0644)
+				Expect(err).To(BeNil())
+
+				os.Setenv("VCAP_SERVICES_FILE_PATH", vcapFile)
+
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/"+OSName+"/"+InstallationMethod+"/latest?bitness=64&include=nginx&include=process&include=dotnet",
+					api_header_check)
+
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/processmoduleconfig",
+					api_header_check)
+			})
+
+			It("loads credentials from file and installs dynatrace", func() {
+				if runtime.GOOS != "windows" {
+					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
+				}
+
+				err = hook.AfterCompile(stager)
+				Expect(err).To(BeNil())
+
+				Expect(buffer.String()).To(ContainSubstring("Loading VCAP services from file: " + vcapFile))
+			})
+		})
+
+		Context("VCAP_SERVICES_FILE_PATH points to non-existent file", func() {
+			BeforeEach(func() {
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Setenv("VCAP_SERVICES", `{
+					"0": [{"name":"dynatrace","credentials":{"apiurl":"https://example.com","apitoken":"`+apiToken+`","environmentid":"`+environmentID+`"}}]
+				}`)
+				os.Setenv("VCAP_SERVICES_FILE_PATH", "/nonexistent/path/vcap_services.json")
+			})
+
+			It("does nothing and succeeds with error log", func() {
+				err = hook.AfterCompile(stager)
+				Expect(err).To(BeNil())
+
+				Expect(buffer.String()).To(ContainSubstring("Failed to read VCAP services file /nonexistent/path/vcap_services.json"))
+			})
+		})
+
+		Context("VCAP_SERVICES_FILE_PATH points to file with invalid JSON", func() {
+			BeforeEach(func() {
+				os.Setenv("BP_DEBUG", "true")
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Setenv("VCAP_SERVICES", "{}")
+
+				vcapFile := filepath.Join(buildDir, "vcap_services_invalid.json")
+				err = os.WriteFile(vcapFile, []byte("not valid json"), 0644)
+				Expect(err).To(BeNil())
+
+				os.Setenv("VCAP_SERVICES_FILE_PATH", vcapFile)
+			})
+
+			It("does nothing and succeeds with debug log for unmarshal failure", func() {
+				err = hook.AfterCompile(stager)
+				Expect(err).To(BeNil())
+
+				Expect(buffer.String()).To(ContainSubstring("Failed to unmarshal VCAP_SERVICES:"))
+			})
+		})
+
+		Context("VCAP_SERVICES_FILE_PATH points to file with empty JSON object", func() {
+			var vcapFile string
+
+			BeforeEach(func() {
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Setenv("VCAP_SERVICES", "{}")
+
+				vcapFile = filepath.Join(buildDir, "vcap_services_empty.json")
+				err = os.WriteFile(vcapFile, []byte("{}"), 0644)
+				Expect(err).To(BeNil())
+
+				os.Setenv("VCAP_SERVICES_FILE_PATH", vcapFile)
+			})
+
+			It("does nothing and succeeds", func() {
+				err = hook.AfterCompile(stager)
+				Expect(err).To(BeNil())
+
+				Expect(buffer.String()).To(ContainSubstring("Loading VCAP services from file: " + vcapFile))
+			})
+		})
+
+		Context("VCAP_SERVICES_FILE_PATH takes precedence over VCAP_SERVICES env var", func() {
+			var vcapFile string
+
+			BeforeEach(func() {
+				os.Setenv("BP_DEBUG", "true")
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+
+				// Env var has a different (non-dynatrace) service
+				os.Setenv("VCAP_SERVICES", `{"0": [{"name":"mysql"}]}`)
+
+				// File has the dynatrace service
+				vcapContent := `{
+					"0": [{"name":"dynatrace","credentials":{"apiurl":"https://example.com","apitoken":"` + apiToken + `","environmentid":"` + environmentID + `"}}]
+				}`
+
+				vcapFile = filepath.Join(buildDir, "vcap_services_precedence.json")
+				err = os.WriteFile(vcapFile, []byte(vcapContent), 0644)
+				Expect(err).To(BeNil())
+
+				os.Setenv("VCAP_SERVICES_FILE_PATH", vcapFile)
+
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/"+OSName+"/"+InstallationMethod+"/latest?bitness=64&include=nginx&include=process&include=dotnet",
+					api_header_check)
+
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/processmoduleconfig",
+					api_header_check)
+			})
+
+			It("uses file content and ignores env var", func() {
+				if runtime.GOOS != "windows" {
+					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
+				}
+
+				err = hook.AfterCompile(stager)
+				Expect(err).To(BeNil())
+
+				Expect(buffer.String()).To(ContainSubstring("Both VCAP_SERVICES_FILE_PATH and VCAP_SERVICES are set, using file: " + vcapFile))
+				Expect(buffer.String()).To(ContainSubstring("Loading VCAP services from file: " + vcapFile))
+				Expect(buffer.String()).NotTo(ContainSubstring("Loading VCAP services from environment variable"))
+			})
+		})
+
+		Context("VCAP_SERVICES_FILE_PATH is empty string with VCAP_SERVICES set", func() {
+			BeforeEach(func() {
+				os.Setenv("BP_DEBUG", "true")
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Setenv("VCAP_SERVICES", `{
+					"0": [{"name":"dynatrace","credentials":{"apiurl":"https://example.com","apitoken":"`+apiToken+`","environmentid":"`+environmentID+`"}}]
+				}`)
+				os.Setenv("VCAP_SERVICES_FILE_PATH", "")
+
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/"+OSName+"/"+InstallationMethod+"/latest?bitness=64&include=nginx&include=process&include=dotnet",
+					api_header_check)
+
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/processmoduleconfig",
+					api_header_check)
+			})
+
+			It("warns about empty path and falls back to env var", func() {
+				if runtime.GOOS != "windows" {
+					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
+				}
+
+				err = hook.AfterCompile(stager)
+				Expect(err).To(BeNil())
+
+				Expect(buffer.String()).To(ContainSubstring("VCAP_SERVICES_FILE_PATH is set but empty, falling back to VCAP_SERVICES environment variable"))
+			})
+		})
+
+		Context("Neither VCAP_SERVICES_FILE_PATH nor VCAP_SERVICES is set", func() {
+			BeforeEach(func() {
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Unsetenv("VCAP_SERVICES_FILE_PATH")
+				os.Setenv("VCAP_SERVICES", "")
+			})
+
+			It("does nothing and succeeds", func() {
+				err = hook.AfterCompile(stager)
+				Expect(err).To(BeNil())
+
+				Expect(buffer.String()).To(Equal(""))
 			})
 		})
 	})
