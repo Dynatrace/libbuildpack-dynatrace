@@ -218,6 +218,30 @@ var _ = Describe("dynatraceHook", func() {
 			}
 		})
 
+		Context("no service env vars are set", func() {
+			BeforeEach(func() {
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Unsetenv("VCAP_SERVICES")
+				os.Unsetenv("VCAP_SERVICES_FILE_PATH")
+				os.Unsetenv("SERVICE_BINDING_ROOT")
+			})
+
+			It("does nothing and succeeds", func() {
+				err = hook.AfterCompile(stager)
+				Expect(err).To(BeNil())
+
+				Expect(buffer.String()).To(Equal(""))
+			})
+
+			It("logs credentials not found when debug is enabled", func() {
+				os.Setenv("BP_DEBUG", "true")
+				err = hook.AfterCompile(stager)
+				Expect(err).To(BeNil())
+
+				Expect(buffer.String()).To(ContainSubstring("Dynatrace service credentials not found!"))
+			})
+		})
+
 		Context("VCAP_SERVICES is empty", func() {
 			BeforeEach(func() {
 				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
@@ -1071,19 +1095,21 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 		})
 
-		Context("SERVICE_BINDING_ROOT set but dynatrace folder does not exist", func() {
+		Context("SERVICE_BINDING_ROOT set but no matching binding exists", func() {
 			BeforeEach(func() {
 				os.Setenv("BP_DEBUG", "true")
 				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
 				os.Setenv("VCAP_SERVICES", "")
+				err = os.MkdirAll(filepath.Join(buildDir, "service-bindings"), 0755)
+				Expect(err).To(BeNil())
 				os.Setenv("SERVICE_BINDING_ROOT", filepath.Join(buildDir, "service-bindings"))
 			})
 
-			It("does nothing and logs debug", func() {
+			It("does nothing and logs warning", func() {
 				err = hook.AfterCompile(stager)
 				Expect(err).To(BeNil())
 
-				Expect(buffer.String()).To(ContainSubstring("No dynatrace service binding found at"))
+				Expect(buffer.String()).To(ContainSubstring("No dynatrace service binding found under"))
 			})
 		})
 
@@ -1097,6 +1123,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				err = os.MkdirAll(bindingDir, 0755)
 				Expect(err).To(BeNil())
 
+				os.WriteFile(filepath.Join(bindingDir, "type"), []byte("dynatrace"), 0644)
 				os.WriteFile(filepath.Join(bindingDir, "environmentid"), []byte(environmentID), 0644)
 				os.WriteFile(filepath.Join(bindingDir, "apitoken"), []byte(apiToken), 0644)
 				os.WriteFile(filepath.Join(bindingDir, "apiurl"), []byte("https://example.com"), 0644)
@@ -1133,6 +1160,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				err = os.MkdirAll(bindingDir, 0755)
 				Expect(err).To(BeNil())
 
+				os.WriteFile(filepath.Join(bindingDir, "type"), []byte("dynatrace"), 0644)
 				os.WriteFile(filepath.Join(bindingDir, "environmentid"), []byte(environmentID), 0644)
 
 				os.Setenv("SERVICE_BINDING_ROOT", filepath.Join(buildDir, "service-bindings"))
@@ -1156,6 +1184,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				err = os.MkdirAll(bindingDir, 0755)
 				Expect(err).To(BeNil())
 
+				os.WriteFile(filepath.Join(bindingDir, "type"), []byte("dynatrace"), 0644)
 				os.WriteFile(filepath.Join(bindingDir, "customoneagenturl"), []byte("https://example.com/oneagent"), 0644)
 				os.WriteFile(filepath.Join(bindingDir, "apiurl"), []byte("https://example.com"), 0644)
 				os.WriteFile(filepath.Join(bindingDir, "apitoken"), []byte(apiToken), 0644)
@@ -1193,6 +1222,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				err = os.MkdirAll(bindingDir, 0755)
 				Expect(err).To(BeNil())
 
+				os.WriteFile(filepath.Join(bindingDir, "type"), []byte("dynatrace"), 0644)
 				os.WriteFile(filepath.Join(bindingDir, "environmentid"), []byte(environmentID), 0644)
 				os.WriteFile(filepath.Join(bindingDir, "apitoken"), []byte(apiToken), 0644)
 				os.WriteFile(filepath.Join(bindingDir, "apiurl"), []byte("https://example.com"), 0644)
@@ -1233,6 +1263,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				err = os.MkdirAll(bindingDir, 0755)
 				Expect(err).To(BeNil())
 
+				os.WriteFile(filepath.Join(bindingDir, "type"), []byte("dynatrace"), 0644)
 				os.WriteFile(filepath.Join(bindingDir, "environmentid"), []byte(environmentID), 0644)
 				os.WriteFile(filepath.Join(bindingDir, "apitoken"), []byte(apiToken), 0644)
 				os.WriteFile(filepath.Join(bindingDir, "apiurl"), []byte("https://example.com"), 0644)
@@ -1269,6 +1300,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				err = os.MkdirAll(bindingDir, 0755)
 				Expect(err).To(BeNil())
 
+				os.WriteFile(filepath.Join(bindingDir, "type"), []byte("dynatrace"), 0644)
 				os.WriteFile(filepath.Join(bindingDir, "environmentid"), []byte(environmentID), 0644)
 				os.WriteFile(filepath.Join(bindingDir, "apitoken"), []byte(apiToken), 0644)
 				os.WriteFile(filepath.Join(bindingDir, "apiurl"), []byte("https://example.com"), 0644)
@@ -1305,6 +1337,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				err = os.MkdirAll(bindingDir, 0755)
 				Expect(err).To(BeNil())
 
+				os.WriteFile(filepath.Join(bindingDir, "type"), []byte("dynatrace"), 0644)
 				os.WriteFile(filepath.Join(bindingDir, "environmentid"), []byte(environmentID+"\n  "), 0644)
 				os.WriteFile(filepath.Join(bindingDir, "apitoken"), []byte("  "+apiToken+"\n"), 0644)
 				os.WriteFile(filepath.Join(bindingDir, "apiurl"), []byte("https://example.com\n"), 0644)
@@ -1330,6 +1363,192 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 		})
 
+		// --- servicebinding.io spec compliance tests ---
+
+		Context("SERVICE_BINDING_ROOT with directory name containing dynatrace as substring", func() {
+			BeforeEach(func() {
+				os.Setenv("BP_DEBUG", "true")
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Setenv("VCAP_SERVICES", "")
+
+				bindingDir := filepath.Join(buildDir, "service-bindings", "my-dynatrace-binding")
+				err = os.MkdirAll(bindingDir, 0755)
+				Expect(err).To(BeNil())
+
+				os.WriteFile(filepath.Join(bindingDir, "type"), []byte("dynatrace"), 0644)
+				os.WriteFile(filepath.Join(bindingDir, "environmentid"), []byte(environmentID), 0644)
+				os.WriteFile(filepath.Join(bindingDir, "apitoken"), []byte(apiToken), 0644)
+				os.WriteFile(filepath.Join(bindingDir, "apiurl"), []byte("https://example.com"), 0644)
+
+				os.Setenv("SERVICE_BINDING_ROOT", filepath.Join(buildDir, "service-bindings"))
+
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/"+OSName+"/"+InstallationMethod+"/latest?bitness=64&include=nginx&include=process&include=dotnet",
+					api_header_check)
+
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/processmoduleconfig",
+					api_header_check)
+			})
+
+			It("discovers binding by directory name substring and installs", func() {
+				if runtime.GOOS != "windows" {
+					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
+				}
+
+				err = hook.AfterCompile(stager)
+				Expect(err).To(BeNil())
+
+				Expect(buffer.String()).To(ContainSubstring("Loading Dynatrace credentials from service binding"))
+				Expect(buffer.String()).To(ContainSubstring("Found one matching service: my-dynatrace-binding"))
+			})
+		})
+
+		Context("SERVICE_BINDING_ROOT with directory name containing Dynatrace uppercase", func() {
+			BeforeEach(func() {
+				os.Setenv("BP_DEBUG", "true")
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Setenv("VCAP_SERVICES", "")
+
+				bindingDir := filepath.Join(buildDir, "service-bindings", "Dynatrace-prod")
+				err = os.MkdirAll(bindingDir, 0755)
+				Expect(err).To(BeNil())
+
+				os.WriteFile(filepath.Join(bindingDir, "environmentid"), []byte(environmentID), 0644)
+				os.WriteFile(filepath.Join(bindingDir, "apitoken"), []byte(apiToken), 0644)
+				os.WriteFile(filepath.Join(bindingDir, "apiurl"), []byte("https://example.com"), 0644)
+
+				os.Setenv("SERVICE_BINDING_ROOT", filepath.Join(buildDir, "service-bindings"))
+
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/"+OSName+"/"+InstallationMethod+"/latest?bitness=64&include=nginx&include=process&include=dotnet",
+					api_header_check)
+
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/processmoduleconfig",
+					api_header_check)
+			})
+
+			It("matches case-insensitively on directory name", func() {
+				if runtime.GOOS != "windows" {
+					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
+				}
+
+				err = hook.AfterCompile(stager)
+				Expect(err).To(BeNil())
+
+				Expect(buffer.String()).To(ContainSubstring("Found one matching service: Dynatrace-prod"))
+			})
+		})
+
+		Context("SERVICE_BINDING_ROOT with directory name not containing dynatrace", func() {
+			BeforeEach(func() {
+				os.Setenv("BP_DEBUG", "true")
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Setenv("VCAP_SERVICES", "")
+
+				bindingDir := filepath.Join(buildDir, "service-bindings", "mysql-binding")
+				err = os.MkdirAll(bindingDir, 0755)
+				Expect(err).To(BeNil())
+
+				os.WriteFile(filepath.Join(bindingDir, "environmentid"), []byte(environmentID), 0644)
+				os.WriteFile(filepath.Join(bindingDir, "apitoken"), []byte(apiToken), 0644)
+
+				os.Setenv("SERVICE_BINDING_ROOT", filepath.Join(buildDir, "service-bindings"))
+			})
+
+			It("skips binding whose name does not contain dynatrace", func() {
+				err = hook.AfterCompile(stager)
+				Expect(err).To(BeNil())
+
+				Expect(buffer.String()).To(ContainSubstring("No dynatrace service binding found under"))
+			})
+		})
+
+		Context("SERVICE_BINDING_ROOT with multiple matching bindings", func() {
+			BeforeEach(func() {
+				os.Setenv("BP_DEBUG", "true")
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Setenv("VCAP_SERVICES", "")
+
+				bindingDir1 := filepath.Join(buildDir, "service-bindings", "dynatrace-prod")
+				err = os.MkdirAll(bindingDir1, 0755)
+				Expect(err).To(BeNil())
+				os.WriteFile(filepath.Join(bindingDir1, "environmentid"), []byte(environmentID), 0644)
+				os.WriteFile(filepath.Join(bindingDir1, "apitoken"), []byte(apiToken), 0644)
+				os.WriteFile(filepath.Join(bindingDir1, "apiurl"), []byte("https://example.com"), 0644)
+
+				bindingDir2 := filepath.Join(buildDir, "service-bindings", "dynatrace-staging")
+				err = os.MkdirAll(bindingDir2, 0755)
+				Expect(err).To(BeNil())
+				os.WriteFile(filepath.Join(bindingDir2, "environmentid"), []byte("999999"), 0644)
+				os.WriteFile(filepath.Join(bindingDir2, "apitoken"), []byte("OtherToken"), 0644)
+				os.WriteFile(filepath.Join(bindingDir2, "apiurl"), []byte("https://other.example.com"), 0644)
+
+				os.Setenv("SERVICE_BINDING_ROOT", filepath.Join(buildDir, "service-bindings"))
+			})
+
+			It("warns about multiple matches and does nothing", func() {
+				err = hook.AfterCompile(stager)
+				Expect(err).To(BeNil())
+
+				Expect(buffer.String()).To(ContainSubstring("More than one matching service binding found"))
+			})
+		})
+
+		Context("SERVICE_BINDING_ROOT with mixed bindings only one matching", func() {
+			BeforeEach(func() {
+				os.Setenv("BP_DEBUG", "true")
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Setenv("VCAP_SERVICES", "")
+
+				// Non-dynatrace binding
+				mysqlDir := filepath.Join(buildDir, "service-bindings", "mysql")
+				err = os.MkdirAll(mysqlDir, 0755)
+				Expect(err).To(BeNil())
+
+				// Dynatrace binding
+				dtDir := filepath.Join(buildDir, "service-bindings", "dynatrace")
+				err = os.MkdirAll(dtDir, 0755)
+				Expect(err).To(BeNil())
+				os.WriteFile(filepath.Join(dtDir, "type"), []byte("dynatrace"), 0644)
+				os.WriteFile(filepath.Join(dtDir, "environmentid"), []byte(environmentID), 0644)
+				os.WriteFile(filepath.Join(dtDir, "apitoken"), []byte(apiToken), 0644)
+				os.WriteFile(filepath.Join(dtDir, "apiurl"), []byte("https://example.com"), 0644)
+
+				os.Setenv("SERVICE_BINDING_ROOT", filepath.Join(buildDir, "service-bindings"))
+
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/"+OSName+"/"+InstallationMethod+"/latest?bitness=64&include=nginx&include=process&include=dotnet",
+					api_header_check)
+
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/processmoduleconfig",
+					api_header_check)
+			})
+
+			It("selects the dynatrace binding and ignores others", func() {
+				if runtime.GOOS != "windows" {
+					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
+				}
+
+				err = hook.AfterCompile(stager)
+				Expect(err).To(BeNil())
+
+				Expect(buffer.String()).To(ContainSubstring("Found one matching service: dynatrace"))
+			})
+		})
+
+		Context("SERVICE_BINDING_ROOT directory does not exist", func() {
+			BeforeEach(func() {
+				os.Setenv("BP_DEBUG", "true")
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Setenv("VCAP_SERVICES", "")
+				os.Setenv("SERVICE_BINDING_ROOT", filepath.Join(buildDir, "nonexistent"))
+			})
+
+			It("warns about unreadable directory and does nothing", func() {
+				err = hook.AfterCompile(stager)
+				Expect(err).To(BeNil())
+
+				Expect(buffer.String()).To(ContainSubstring("Failed to read SERVICE_BINDING_ROOT directory"))
+			})
+		})
+
 		// --- Multi-source warning tests ---
 
 		Context("Both VCAP_SERVICES and SERVICE_BINDING_ROOT are set", func() {
@@ -1343,6 +1562,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				bindingDir := filepath.Join(buildDir, "service-bindings", "dynatrace")
 				err = os.MkdirAll(bindingDir, 0755)
 				Expect(err).To(BeNil())
+				os.WriteFile(filepath.Join(bindingDir, "type"), []byte("dynatrace"), 0644)
 				os.WriteFile(filepath.Join(bindingDir, "environmentid"), []byte(environmentID), 0644)
 				os.WriteFile(filepath.Join(bindingDir, "apitoken"), []byte(apiToken), 0644)
 				os.WriteFile(filepath.Join(bindingDir, "apiurl"), []byte("https://example.com"), 0644)
@@ -1380,6 +1600,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				err = os.MkdirAll(bindingDir, 0755)
 				Expect(err).To(BeNil())
 
+				os.WriteFile(filepath.Join(bindingDir, "type"), []byte("dynatrace"), 0644)
 				os.WriteFile(filepath.Join(bindingDir, "environmentid"), []byte(environmentID), 0644)
 				os.WriteFile(filepath.Join(bindingDir, "apitoken"), []byte(apiToken), 0644)
 				os.WriteFile(filepath.Join(bindingDir, "apiurl"), []byte("https://example.com"), 0644)

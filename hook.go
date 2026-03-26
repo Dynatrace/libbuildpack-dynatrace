@@ -178,13 +178,24 @@ func (h *Hook) loadVCAPServicesData() []byte {
 // getCredentials returns the configuration from the environment, or nil if not found.
 func (h *Hook) getCredentials() *credentials {
 
-	creds := h.loadCredentialsFromVCAP()
+	vcapCreds := h.loadCredentialsFromVCAP()
+	bindingCreds := h.loadCredentialsFromServiceBinding()
+
+	if vcapCreds != nil && bindingCreds != nil {
+		h.Log.Warning("Multiple credential sources detected: VCAP_SERVICES and SERVICE_BINDING_ROOT. Using VCAP_SERVICES.")
+	}
+
+	creds := vcapCreds
+	if creds == nil {
+		creds = bindingCreds
+	}
 
 	if creds == nil {
-		creds = h.loadCredentialsFromServiceBinding()
+		return nil
 	}
 
 	if (creds.EnvironmentID != "" && creds.APIToken != "") || creds.CustomOneAgentURL != "" {
+		h.Log.Debug("Found one matching service: %s", creds.ServiceName)
 		return creds
 	}
 
@@ -215,36 +226,58 @@ func (h *Hook) loadCredentialsFromServiceBinding() *credentials {
 		return nil
 	}
 
-	bindingDir := filepath.Join(root, "dynatrace")
-	if info, err := os.Stat(bindingDir); err != nil || !info.IsDir() {
-		h.Log.Warning("No dynatrace service binding found at %s", bindingDir)
+	dynatrace, err := findDynatraceServiceBinding(root)
+	if err != nil {
+		h.Log.Warning("%s", err)
 		return nil
 	}
 
+	// Exactly one candidate — read its credential files.
+	bindingDir := filepath.Join(root, dynatrace.Name())
 	h.Log.Debug("Loading Dynatrace credentials from service binding: %s", bindingDir)
 
-	readFile := func(name string) string {
-		return h.readBindingFile(bindingDir, name)
-	}
-
-	serviceName := readFile("name")
+	serviceName := h.readBindingFile(bindingDir, "name")
 	if serviceName == "" {
-		serviceName = "dynatrace"
+		serviceName = dynatrace.Name()
 	}
 
-	creds := &credentials{
+	return &credentials{
 		ServiceName:       serviceName,
-		EnvironmentID:     readFile("environmentid"),
-		APIToken:          readFile("apitoken"),
-		APIURL:            readFile("apiurl"),
-		CustomOneAgentURL: readFile("customoneagenturl"),
-		SkipErrors:        readFile("skiperrors") == "true",
-		NetworkZone:       readFile("networkzone"),
-		EnableFIPS:        readFile("enablefips") == "true",
-		AddTechnologies:   readFile("addtechnologies"),
+		EnvironmentID:     h.readBindingFile(bindingDir, "environmentid"),
+		APIToken:          h.readBindingFile(bindingDir, "apitoken"),
+		APIURL:            h.readBindingFile(bindingDir, "apiurl"),
+		CustomOneAgentURL: h.readBindingFile(bindingDir, "customoneagenturl"),
+		SkipErrors:        h.readBindingFile(bindingDir, "skiperrors") == "true",
+		NetworkZone:       h.readBindingFile(bindingDir, "networkzone"),
+		EnableFIPS:        h.readBindingFile(bindingDir, "enablefips") == "true",
+		AddTechnologies:   h.readBindingFile(bindingDir, "addtechnologies"),
+	}
+}
+
+func findDynatraceServiceBinding(root string) (os.DirEntry, error) {
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to read SERVICE_BINDING_ROOT directory %s: %w", root, err)
 	}
 
-	return creds
+	// First pass: collect directories whose name contains "dynatrace" (case-insensitive).
+	// This mirrors the VCAP_SERVICES matching strategy and avoids reading any files until
+	// we have confirmed exactly one candidate.
+	var candidates []os.DirEntry
+	for _, entry := range entries {
+		if entry.IsDir() && strings.Contains(strings.ToLower(entry.Name()), "dynatrace") {
+			candidates = append(candidates, entry)
+		}
+	}
+
+	if len(candidates) == 0 {
+		return nil, fmt.Errorf("No dynatrace service binding found under %s", root)
+	}
+
+	if len(candidates) > 1 {
+		return nil, fmt.Errorf("More than one matching service binding found under %s", root)
+	}
+	return candidates[0], nil
 }
 
 func (h *Hook) loadCredentialsFromVCAP() *credentials {
