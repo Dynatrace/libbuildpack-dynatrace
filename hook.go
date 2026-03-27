@@ -296,46 +296,49 @@ func (h *Hook) loadCredentialsFromVCAP() *credentials {
 		return nil
 	}
 
-	var found []*credentials
+	type serviceEntry struct {
+		Name        string
+		Credentials map[string]interface{}
+	}
+
+	var found []serviceEntry
 
 	for _, services := range vcapServices {
 		for _, service := range services {
-			if !strings.Contains(strings.ToLower(service.Name), "dynatrace") {
-				continue
+			if strings.Contains(strings.ToLower(service.Name), "dynatrace") {
+				found = append(found, serviceEntry{Name: service.Name, Credentials: service.Credentials})
 			}
-
-			queryString := func(key string) string {
-				if value, ok := service.Credentials[key].(string); ok {
-					return value
-				}
-				return ""
-			}
-
-			creds := &credentials{
-				ServiceName:       service.Name,
-				EnvironmentID:     queryString("environmentid"),
-				APIToken:          queryString("apitoken"),
-				APIURL:            queryString("apiurl"),
-				CustomOneAgentURL: queryString("customoneagenturl"),
-				SkipErrors:        queryString("skiperrors") == "true",
-				NetworkZone:       queryString("networkzone"),
-				EnableFIPS:        queryString("enablefips") == "true",
-				AddTechnologies:   queryString("addtechnologies"),
-			}
-
-			found = append(found, creds)
 		}
-	}
-
-	if len(found) == 1 {
-		return found[0]
 	}
 
 	if len(found) > 1 {
 		h.Log.Warning("More than one matching service found!")
+		return nil
 	}
 
-	return nil
+	if len(found) == 0 {
+		return nil
+	}
+
+	service := found[0]
+	queryString := func(key string) string {
+		if value, ok := service.Credentials[key].(string); ok {
+			return value
+		}
+		return ""
+	}
+
+	return &credentials{
+		ServiceName:       service.Name,
+		EnvironmentID:     queryString("environmentid"),
+		APIToken:          queryString("apitoken"),
+		APIURL:            queryString("apiurl"),
+		CustomOneAgentURL: queryString("customoneagenturl"),
+		SkipErrors:        queryString("skiperrors") == "true",
+		NetworkZone:       queryString("networkzone"),
+		EnableFIPS:        queryString("enablefips") == "true",
+		AddTechnologies:   queryString("addtechnologies"),
+	}
 }
 
 // download gets url, and stores it as filePath, retrying a few more times if the downloads fail.
