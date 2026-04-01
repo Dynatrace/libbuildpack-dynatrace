@@ -82,7 +82,7 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 		return nil
 	}
 
-	h.Log.Debug("Dynatrace service credentials found. Setting up Dynatrace OneAgent.")
+	h.Log.Info("Dynatrace service credentials found. Setting up Dynatrace OneAgent.")
 
 	installDir := filepath.Join("dynatrace", "oneagent")
 
