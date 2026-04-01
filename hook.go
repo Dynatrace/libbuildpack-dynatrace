@@ -49,6 +49,9 @@ type Hook struct {
 
 	// MaxDownloadRetries is the maximum number of retries the hook will try to download the agent if they fail.
 	MaxDownloadRetries int
+
+	// GOOS holds the target operating system. Defaults to runtime.GOOS. Override in tests to simulate other OSes.
+	GOOS string
 }
 
 // NewHook returns a libbuildpack.Hook instance for integrating monitoring with Dynatrace. The technology names for the
@@ -59,6 +62,7 @@ func NewHook(technologies ...string) libbuildpack.Hook {
 		Command:             &libbuildpack.Command{},
 		IncludeTechnologies: technologies,
 		MaxDownloadRetries:  3,
+		GOOS:                runtime.GOOS,
 	}
 }
 
@@ -78,20 +82,20 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 		return nil
 	}
 
-	h.Log.Info("Dynatrace service credentials found. Setting up Dynatrace OneAgent.")
+	h.Log.Debug("Dynatrace service credentials found. Setting up Dynatrace OneAgent.")
 
 	installDir := filepath.Join("dynatrace", "oneagent")
 
 	// download installer
 	var installerFilename string
-	if runtime.GOOS == "linux" {
+	if h.GOOS == "linux" {
 		installerFilename = "paasInstaller.sh"
-	} else if runtime.GOOS == "windows" {
+	} else if h.GOOS == "windows" {
 		installerFilename = "paasInstaller.zip"
 	} else {
 		// This is the only place where we need to return an error.
 		// All following operating system checks are just to determine installation specifics.
-		return errors.New("libbuildpack-dynatrace: Unsupported operating system: " + runtime.GOOS)
+		return errors.New("libbuildpack-dynatrace: Unsupported operating system: " + h.GOOS)
 	}
 
 	installerFilePath := filepath.Join(os.TempDir(), installerFilename)
@@ -105,9 +109,9 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 	}
 
 	// run installer
-	if runtime.GOOS == "linux" {
+	if h.GOOS == "linux" {
 		err = h.runInstallerUnix(installerFilePath, installDir, creds, stager)
-	} else if runtime.GOOS == "windows" {
+	} else if h.GOOS == "windows" {
 		err = h.runInstallerWindows(installerFilePath, installDir, creds, stager)
 	}
 
@@ -309,10 +313,10 @@ func (h *Hook) download(url, filePath string, stager *libbuildpack.Stager, creds
 
 func (h *Hook) getDownloadURL(c *credentials) string {
 	var osType, installerType string
-	if runtime.GOOS == "linux" {
+	if h.GOOS == "linux" {
 		osType = "unix"
 		installerType = "paas-sh"
-	} else if runtime.GOOS == "windows" {
+	} else if h.GOOS == "windows" {
 		osType = "windows"
 		installerType = "paas"
 	}

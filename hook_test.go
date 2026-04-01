@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -96,6 +95,7 @@ var _ = Describe("dynatraceHook", func() {
 			Log:                 logger,
 			MaxDownloadRetries:  0,
 			IncludeTechnologies: []string{"nginx", "process", "dotnet"},
+			GOOS:                "linux",
 		}
 
 		api_header_check = func(req *http.Request) (*http.Response, error) {
@@ -103,7 +103,7 @@ var _ = Describe("dynatraceHook", func() {
 			if resp_header == "" {
 				return httpmock.NewStringResponse(500, `{"error": "No Authorization Header found"}`), nil
 			}
-			if strings.Index(resp_header, "Api-Token") == -1 {
+			if !strings.Contains(resp_header, "Api-Token") {
 				return httpmock.NewStringResponse(500, `{"error": "No Api-Token found in Authorization Header"}`), nil
 			}
 
@@ -311,7 +311,7 @@ var _ = Describe("dynatraceHook", func() {
 			})
 
 			It("installs dynatrace", func() {
-				if runtime.GOOS != "windows" {
+				if hook.GOOS != "windows" {
 					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
 				}
 
@@ -322,7 +322,7 @@ var _ = Describe("dynatraceHook", func() {
 				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
 				Expect(err).To(BeNil())
 
-				if runtime.GOOS == "windows" {
+				if hook.GOOS == "windows" {
 					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
 set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
 set DT_AGENTACTIVE=true
@@ -359,7 +359,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 
 			It("installs dynatrace", func() {
-				if runtime.GOOS != "windows" {
+				if hook.GOOS != "windows" {
 					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
 				}
 
@@ -370,7 +370,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
 				Expect(err).To(BeNil())
 
-				if runtime.GOOS == "windows" {
+				if hook.GOOS == "windows" {
 					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
 set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
 set DT_AGENTACTIVE=true
@@ -404,7 +404,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 
 			It("installs dynatrace and writes comment to uxitagentproc.conf", func() {
-				if runtime.GOOS != "windows" {
+				if hook.GOOS != "windows" {
 					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
 				}
 
@@ -424,7 +424,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				contents, err = os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
 				Expect(err).To(BeNil())
 
-				if runtime.GOOS == "windows" {
+				if hook.GOOS == "windows" {
 					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
 set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
 set DT_AGENTACTIVE=true
@@ -460,7 +460,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 
 			It("installs dynatrace", func() {
 
-				if runtime.GOOS != "windows" {
+				if hook.GOOS != "windows" {
 					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
 				}
 
@@ -479,7 +479,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				contents, err = os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
 				Expect(err).To(BeNil())
 
-				if runtime.GOOS == "windows" {
+				if hook.GOOS == "windows" {
 					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
 set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
 set DT_AGENTACTIVE=true
@@ -511,7 +511,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 
 			It("installs dynatrace", func() {
-				if runtime.GOOS != "windows" {
+				if hook.GOOS != "windows" {
 					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
 				}
 
@@ -522,7 +522,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
 				Expect(err).To(BeNil())
 
-				if runtime.GOOS == "windows" {
+				if hook.GOOS == "windows" {
 					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
 set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
 set DT_AGENTACTIVE=true
@@ -553,7 +553,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 
 			It("installs dynatrace", func() {
-				if runtime.GOOS != "windows" {
+				if hook.GOOS != "windows" {
 					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
 				}
 
@@ -564,7 +564,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
 				Expect(err).To(BeNil())
 
-				if runtime.GOOS == "windows" {
+				if hook.GOOS == "windows" {
 					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
 set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
 set DT_AGENTACTIVE=true
@@ -598,7 +598,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 
 			It("installs dynatrace", func() {
-				if runtime.GOOS != "windows" {
+				if hook.GOOS != "windows" {
 					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
 				}
 
@@ -609,7 +609,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
 				Expect(err).To(BeNil())
 
-				if runtime.GOOS == "windows" {
+				if hook.GOOS == "windows" {
 					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
 set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
 set DT_AGENTACTIVE=true
@@ -641,7 +641,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 
 			It("installs dynatrace", func() {
-				if runtime.GOOS != "windows" {
+				if hook.GOOS != "windows" {
 					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
 				}
 
@@ -652,7 +652,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
 				Expect(err).To(BeNil())
 
-				if runtime.GOOS == "windows" {
+				if hook.GOOS == "windows" {
 					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
 set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
 set DT_AGENTACTIVE=true
@@ -696,7 +696,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 
 			It("installs dynatrace", func() {
-				if runtime.GOOS != "windows" {
+				if hook.GOOS != "windows" {
 					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
 				}
 
@@ -707,7 +707,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
 				Expect(err).To(BeNil())
 
-				if runtime.GOOS == "windows" {
+				if hook.GOOS == "windows" {
 					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
 set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
 set DT_AGENTACTIVE=true
@@ -753,7 +753,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 
 			It("installs dynatrace", func() {
-				if runtime.GOOS != "windows" {
+				if hook.GOOS != "windows" {
 					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
 				}
 
@@ -763,7 +763,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
 				Expect(err).Should(Succeed())
 
-				if runtime.GOOS == "windows" {
+				if hook.GOOS == "windows" {
 					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
 set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
 set DT_AGENTACTIVE=true
@@ -821,7 +821,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 
 			It("installs dynatrace and deletes FIPS flag file", func() {
-				if runtime.GOOS != "windows" {
+				if hook.GOOS != "windows" {
 					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
 				}
 
@@ -849,7 +849,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 
 			It("installs dynatrace with additional code modules", func() {
-				if runtime.GOOS != "windows" {
+				if hook.GOOS != "windows" {
 					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
 				}
 				err = hook.AfterCompile(stager)
@@ -888,7 +888,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 
 			It("loads credentials from file and installs dynatrace", func() {
-				if runtime.GOOS != "windows" {
+				if hook.GOOS != "windows" {
 					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
 				}
 
@@ -941,6 +941,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			var vcapFile string
 
 			BeforeEach(func() {
+				os.Setenv("BP_DEBUG", "true")
 				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
 				os.Setenv("VCAP_SERVICES", "{}")
 
@@ -988,7 +989,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 
 			It("uses file content and ignores env var", func() {
-				if runtime.GOOS != "windows" {
+				if hook.GOOS != "windows" {
 					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
 				}
 
@@ -1018,7 +1019,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 
 			It("warns about empty path and falls back to env var", func() {
-				if runtime.GOOS != "windows" {
+				if hook.GOOS != "windows" {
 					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
 				}
 
