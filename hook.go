@@ -49,9 +49,6 @@ type Hook struct {
 
 	// MaxDownloadRetries is the maximum number of retries the hook will try to download the agent if they fail.
 	MaxDownloadRetries int
-
-	// GOOS holds the target operating system. Defaults to runtime.GOOS. Override in tests to simulate other OSes.
-	GOOS string
 }
 
 // NewHook returns a libbuildpack.Hook instance for integrating monitoring with Dynatrace. The technology names for the
@@ -62,7 +59,6 @@ func NewHook(technologies ...string) libbuildpack.Hook {
 		Command:             &libbuildpack.Command{},
 		IncludeTechnologies: technologies,
 		MaxDownloadRetries:  3,
-		GOOS:                runtime.GOOS,
 	}
 }
 
@@ -70,7 +66,11 @@ func NewHook(technologies ...string) libbuildpack.Hook {
 func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 	// All other methods in this package are called  from here, which
 	// makes it the main entry-point.
+	return h.injectDynatrace(stager, runtime.GOOS)
 
+}
+
+func (h *Hook) injectDynatrace(stager *libbuildpack.Stager, operatingSystem string) error {
 	var err error
 
 	h.Log.Debug("Checking for enabled dynatrace service...")
@@ -88,18 +88,18 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 
 	// download installer
 	var installerFilename string
-	if h.GOOS == "linux" {
+	if operatingSystem == "linux" {
 		installerFilename = "paasInstaller.sh"
-	} else if h.GOOS == "windows" {
+	} else if operatingSystem == "windows" {
 		installerFilename = "paasInstaller.zip"
 	} else {
 		// This is the only place where we need to return an error.
 		// All following operating system checks are just to determine installation specifics.
-		return errors.New("libbuildpack-dynatrace: Unsupported operating system: " + h.GOOS)
+		return errors.New("libbuildpack-dynatrace: Unsupported operating system: " + operatingSystem)
 	}
 
 	installerFilePath := filepath.Join(os.TempDir(), installerFilename)
-	url := h.getDownloadURL(creds)
+	url := h.getDownloadURL(creds, operatingSystem)
 	err = h.download(url, installerFilePath, stager, creds)
 	if err != nil && creds.SkipErrors {
 		h.Log.Warning("Error during installer download, skipping installation")
@@ -109,9 +109,9 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 	}
 
 	// run installer
-	if h.GOOS == "linux" {
+	if operatingSystem == "linux" {
 		err = h.runInstallerUnix(installerFilePath, installDir, creds, stager)
-	} else if h.GOOS == "windows" {
+	} else if operatingSystem == "windows" {
 		err = h.runInstallerWindows(installerFilePath, installDir, creds, stager)
 	}
 
@@ -152,19 +152,18 @@ func (h *Hook) loadVCAPServicesData() []byte {
 
 	if filePathSet {
 		if filePath == "" {
-			h.Log.Warning("VCAP_SERVICES_FILE_PATH is set but empty, falling back to VCAP_SERVICES environment variable")
-		} else {
-			if os.Getenv("VCAP_SERVICES") != "" {
-				h.Log.Warning("Both VCAP_SERVICES_FILE_PATH and VCAP_SERVICES are set, using file: %s", filePath)
-			}
-			data, err := os.ReadFile(filePath)
-			if err != nil {
-				h.Log.Error("Failed to read VCAP services file %s: %s", filePath, err)
-				return nil
-			}
-			h.Log.Debug("Loading VCAP services from file: %s", filePath)
-			return data
+			h.Log.Debug("VCAP_SERVICES_FILE_PATH is set but empty")
+			return nil
 		}
+
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			h.Log.Error("Failed to read VCAP services file %s: %s", filePath, err)
+			return nil
+		}
+		h.Log.Debug("Loading VCAP services from file: %s", filePath)
+		return data
+
 	}
 
 	envData := os.Getenv("VCAP_SERVICES")
@@ -225,7 +224,7 @@ func (h *Hook) getCredentials() *credentials {
 			if (creds.EnvironmentID != "" && creds.APIToken != "") || creds.CustomOneAgentURL != "" {
 				found = append(found, creds)
 			} else if !(creds.EnvironmentID == "" && creds.APIToken == "") { // One of the fields is empty.
-				h.Log.Warning("Incomplete credentials for service: %s, environment ID: %s, API token: %s", creds.ServiceName,
+				h.Log.Error("Incomplete credentials for service: %s, environment ID: %s, API token: %s", creds.ServiceName,
 					creds.EnvironmentID, creds.APIToken)
 			}
 		}
@@ -237,7 +236,7 @@ func (h *Hook) getCredentials() *credentials {
 	}
 
 	if len(found) > 1 {
-		h.Log.Warning("More than one matching service found!")
+		h.Log.Error("More than one matching service found!")
 	}
 
 	return nil
@@ -311,12 +310,13 @@ func (h *Hook) download(url, filePath string, stager *libbuildpack.Stager, creds
 
 }
 
-func (h *Hook) getDownloadURL(c *credentials) string {
+func (h *Hook) getDownloadURL(c *credentials, operatingSystem string) string {
 	var osType, installerType string
-	if h.GOOS == "linux" {
+	switch operatingSystem {
+	case "linux":
 		osType = "unix"
 		installerType = "paas-sh"
-	} else if h.GOOS == "windows" {
+	case "windows":
 		osType = "windows"
 		installerType = "paas"
 	}
