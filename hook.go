@@ -142,11 +142,6 @@ func (h *Hook) injectDynatrace(stager *libbuildpack.Stager, operatingSystem stri
 }
 
 // loadVCAPServicesData returns the raw VCAP_SERVICES JSON data from the appropriate source.
-// If VCAP_SERVICES_FILE_PATH is set to a non-empty value, the file is read and returned.
-// If VCAP_SERVICES_FILE_PATH is set but empty, a warning is logged and the VCAP_SERVICES
-// environment variable is used as a fallback.
-// If VCAP_SERVICES_FILE_PATH is not set, the VCAP_SERVICES environment variable is used.
-// Returns nil if no data is available from any source.
 func (h *Hook) loadVCAPServicesData() []byte {
 	filePath, filePathSet := os.LookupEnv("VCAP_SERVICES_FILE_PATH")
 
