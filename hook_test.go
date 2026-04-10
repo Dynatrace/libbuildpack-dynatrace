@@ -1,4 +1,4 @@
-package dynatrace_test
+package dynatrace
 
 import (
 	"bytes"
@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	dynatrace "github.com/Dynatrace/libbuildpack-dynatrace"
 	"github.com/cloudfoundry/libbuildpack"
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
@@ -53,7 +52,7 @@ const manifestJson = `{
 	}
 }`
 
-//go:generate mockgen -source=hook.go --destination=mocks_test.go --package=dynatrace_test
+//go:generate mockgen -source=hook.go --destination=mocks_test.go --package=dynatrace
 
 var _ = Describe("dynatraceHook", func() {
 	var (
@@ -67,20 +66,20 @@ var _ = Describe("dynatraceHook", func() {
 		mockCtrl              *gomock.Controller
 		mockCommand           *MockCommand
 		buffer                *bytes.Buffer
-		hook                  dynatrace.Hook
+		hook                  Hook
 		simulateUnixInstaller func(string, io.Writer, io.Writer, string, string)
 		api_header_check      func(req *http.Request) (*http.Response, error)
 	)
 
 	BeforeEach(func() {
 		bpDir, err = os.MkdirTemp("", "libbuildpack-dynatrace.buildpack.")
-		Expect(err).To(BeNil())
+		Expect(err).To(Succeed())
 
 		buildDir, err = os.MkdirTemp("", "libbuildpack-dynatrace.build.")
-		Expect(err).To(BeNil())
+		Expect(err).To(Succeed())
 
 		depsDir, err = os.MkdirTemp("", "libbuildpack-dynatrace.deps.")
-		Expect(err).To(BeNil())
+		Expect(err).To(Succeed())
 
 		depsIdx = "07"
 		err = os.MkdirAll(filepath.Join(depsDir, depsIdx), 0755)
@@ -90,12 +89,11 @@ var _ = Describe("dynatraceHook", func() {
 
 		mockCtrl = gomock.NewController(GinkgoT())
 		mockCommand = NewMockCommand(mockCtrl)
-		hook = dynatrace.Hook{
+		hook = Hook{
 			Command:             mockCommand,
 			Log:                 logger,
 			MaxDownloadRetries:  0,
 			IncludeTechnologies: []string{"nginx", "process", "dotnet"},
-			GOOS:                "linux",
 		}
 
 		api_header_check = func(req *http.Request) (*http.Response, error) {
@@ -121,21 +119,21 @@ var _ = Describe("dynatraceHook", func() {
 
 		simulateUnixInstaller = func(_ string, _, _ io.Writer, file string, _ string) {
 			contents, err := os.ReadFile(file)
-			Expect(err).To(BeNil())
+			Expect(err).To(Succeed())
 
 			Expect(string(contents)).To(Equal("echo Install Dynatrace"))
 
 			err = os.MkdirAll(filepath.Join(buildDir, "dynatrace/oneagent/agent/lib64"), 0755)
-			Expect(err).To(BeNil())
+			Expect(err).To(Succeed())
 
 			err = os.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/agent/lib64/liboneagentproc.so"), []byte("library"), 0644)
-			Expect(err).To(BeNil())
+			Expect(err).To(Succeed())
 
 			err = os.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/dynatrace-env.sh"), []byte("echo running dynatrace-env.sh"), 0644)
-			Expect(err).To(BeNil())
+			Expect(err).To(Succeed())
 
 			err = os.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/manifest.json"), []byte(manifestJson), 0664)
-			Expect(err).To(BeNil())
+			Expect(err).To(Succeed())
 
 			ruxitagentproc := `
 			[section1]
@@ -147,13 +145,13 @@ var _ = Describe("dynatraceHook", func() {
 			key4=val4`
 
 			err = os.MkdirAll(filepath.Join(buildDir, "dynatrace/oneagent/agent/conf"), 0755)
-			Expect(err).To(BeNil())
+			Expect(err).To(Succeed())
 
 			err = os.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/agent/conf/ruxitagentproc.conf"), []byte(ruxitagentproc), 0664)
-			Expect(err).To(BeNil())
+			Expect(err).To(Succeed())
 
 			err = os.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/agent/dt_fips_disabled.flag"), []byte(""), 0664)
-			Expect(err).To(BeNil())
+			Expect(err).To(Succeed())
 		}
 	})
 
@@ -161,7 +159,7 @@ var _ = Describe("dynatraceHook", func() {
 		args := []string{buildDir, "", depsDir, depsIdx}
 
 		manifest, err := libbuildpack.NewManifest(bpDir, logger, time.Now())
-		Expect(err).To(BeNil())
+		Expect(err).To(Succeed())
 
 		stager = libbuildpack.NewStager(args, logger, manifest)
 	})
@@ -170,13 +168,13 @@ var _ = Describe("dynatraceHook", func() {
 		mockCtrl.Finish()
 
 		err = os.RemoveAll(buildDir)
-		Expect(err).To(BeNil())
+		Expect(err).To(Succeed())
 
 		err = os.RemoveAll(bpDir)
-		Expect(err).To(BeNil())
+		Expect(err).To(Succeed())
 
 		err = os.RemoveAll(depsDir)
-		Expect(err).To(BeNil())
+		Expect(err).To(Succeed())
 	})
 
 	Describe("AfterCompile", func() {
@@ -216,8 +214,8 @@ var _ = Describe("dynatraceHook", func() {
 			})
 
 			It("does nothing and succeeds", func() {
-				err = hook.AfterCompile(stager)
-				Expect(err).To(BeNil())
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(Succeed())
 
 				Expect(buffer.String()).To(Equal(""))
 			})
@@ -233,10 +231,25 @@ var _ = Describe("dynatraceHook", func() {
 			})
 
 			It("does nothing and succeeds", func() {
-				err = hook.AfterCompile(stager)
-				Expect(err).To(BeNil())
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(Succeed())
 
 				Expect(buffer.String()).To(Equal(""))
+			})
+		})
+
+		Context("VCAP_SERVICES env var contains invalid JSON", func() {
+			BeforeEach(func() {
+				os.Setenv("BP_DEBUG", "true")
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Setenv("VCAP_SERVICES", "not valid json")
+			})
+
+			It("does nothing and succeeds with debug log for unmarshal failure", func() {
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(Succeed())
+
+				Expect(buffer.String()).To(ContainSubstring("Failed to unmarshal VCAP_SERVICES:"))
 			})
 		})
 
@@ -249,8 +262,8 @@ var _ = Describe("dynatraceHook", func() {
 			})
 
 			It("does nothing and succeeds", func() {
-				err = hook.AfterCompile(stager)
-				Expect(err).To(BeNil())
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(Succeed())
 
 				Expect(buffer.String()).To(Equal(""))
 			})
@@ -267,8 +280,8 @@ var _ = Describe("dynatraceHook", func() {
 			})
 
 			It("does nothing and succeeds", func() {
-				err = hook.AfterCompile(stager)
-				Expect(err).To(BeNil())
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(Succeed())
 
 				Expect(buffer.String()).Should(ContainSubstring("Incomplete credentials for service"))
 			})
@@ -285,10 +298,24 @@ var _ = Describe("dynatraceHook", func() {
 			})
 
 			It("does nothing and succeeds", func() {
-				err = hook.AfterCompile(stager)
-				Expect(err).To(BeNil())
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(Succeed())
 
 				Expect(buffer.String()).To(Equal(""))
+			})
+		})
+
+		Context("unsupported operating system with valid dynatrace credentials", func() {
+			BeforeEach(func() {
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Setenv("VCAP_SERVICES", `{
+					"0": [{"name":"dynatrace","credentials":{"apiurl":"https://example.com","apitoken":"`+apiToken+`","environmentid":"`+environmentID+`"}}]
+				}`)
+			})
+
+			It("returns an unsupported operating system error", func() {
+				err = hook.injectDynatrace(stager, "plan9")
+				Expect(err).To(MatchError(ContainSubstring("Unsupported operating system: plan9")))
 			})
 		})
 
@@ -311,18 +338,18 @@ var _ = Describe("dynatraceHook", func() {
 			})
 
 			It("installs dynatrace", func() {
-				if hook.GOOS != "windows" {
+				if *testOS != "windows" {
 					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
 				}
 
-				err = hook.AfterCompile(stager)
-				Expect(err).To(BeNil())
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(Succeed())
 
 				// Sets up profile.d
 				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
-				Expect(err).To(BeNil())
+				Expect(err).To(Succeed())
 
-				if hook.GOOS == "windows" {
+				if *testOS == "windows" {
 					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
 set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
 set DT_AGENTACTIVE=true
@@ -359,18 +386,18 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 
 			It("installs dynatrace", func() {
-				if hook.GOOS != "windows" {
+				if *testOS != "windows" {
 					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
 				}
 
-				err = hook.AfterCompile(stager)
-				Expect(err).To(BeNil())
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(Succeed())
 
 				// Sets up profile.d
 				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
-				Expect(err).To(BeNil())
+				Expect(err).To(Succeed())
 
-				if hook.GOOS == "windows" {
+				if *testOS == "windows" {
 					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
 set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
 set DT_AGENTACTIVE=true
@@ -384,6 +411,38 @@ export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so
 export DT_LOGSTREAM=stdout
 export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"`))
 				}
+			})
+		})
+
+		Context("VCAP_SERVICES contains dynatrace service with customoneagenturl only (no environmentid or apitoken)", func() {
+			BeforeEach(func() {
+				os.Setenv("BP_DEBUG", "true")
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Setenv("VCAP_SERVICES", `{
+					"0": [{"name":"dynatrace","credentials":{"customoneagenturl":"https://custom.example.com/oneagent"}}]
+				}`)
+
+				httpmock.RegisterResponder("GET", "https://custom.example.com/oneagent", func(r *http.Request) (*http.Response, error) {
+					// customoneagenturl downloads must NOT send an Authorization header
+					if r.Header.Get("Authorization") != "" {
+						return httpmock.NewStringResponse(400, `{"error": "unexpected Authorization header"}`), nil
+					}
+					return getMockResponse(), nil
+				})
+
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/processmoduleconfig",
+					api_header_check)
+			})
+
+			It("installs dynatrace using only the custom URL", func() {
+				if *testOS != "windows" {
+					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
+				}
+
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(Succeed())
+
+				Expect(buffer.String()).To(ContainSubstring("Loading VCAP services from environment variable VCAP_SERVICES"))
 			})
 		})
 
@@ -404,27 +463,27 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 
 			It("installs dynatrace and writes comment to uxitagentproc.conf", func() {
-				if hook.GOOS != "windows" {
+				if *testOS != "windows" {
 					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
 				}
 
-				err = hook.AfterCompile(stager)
-				Expect(err).To(BeNil())
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(Succeed())
 
 				Expect(buffer.String()).To(ContainSubstring("Failed to fetch updated OneAgent config from the API"))
 
 				// Check for comment in ruxitagentproc.conf
 				contents, err := os.ReadFile(filepath.Join(buildDir, "dynatrace/oneagent/agent/conf/ruxitagentproc.conf"))
-				Expect(err).To(BeNil())
+				Expect(err).To(Succeed())
 
 				warn_string := "# Warning: Failed to fetch updated OneAgent config from the API. This config only includes settings provided by the installer."
 				Expect(strings.Contains(string(contents), warn_string)).To(BeTrue())
 
 				// Sets up profile.d
 				contents, err = os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
-				Expect(err).To(BeNil())
+				Expect(err).To(Succeed())
 
-				if hook.GOOS == "windows" {
+				if *testOS == "windows" {
 					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
 set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
 set DT_AGENTACTIVE=true
@@ -460,26 +519,26 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 
 			It("installs dynatrace", func() {
 
-				if hook.GOOS != "windows" {
+				if *testOS != "windows" {
 					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
 				}
 
-				err = hook.AfterCompile(stager)
-				Expect(err).To(BeNil())
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(Succeed())
 
 				Expect(buffer.String()).To(ContainSubstring("Successfully fetched updated OneAgent config from the API"))
 
 				// Check for comment in ruxitagentproc.conf
 				contents, err := os.ReadFile(filepath.Join(buildDir, "dynatrace", "oneagent", "agent", "conf", "ruxitagentproc.conf"))
-				Expect(err).To(BeNil())
+				Expect(err).To(Succeed())
 				configComment := "# This config is a merge between the installer and the Cluster config"
 				Expect(strings.Contains(string(contents), configComment)).To(BeTrue())
 
 				// Sets up profile.d
 				contents, err = os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
-				Expect(err).To(BeNil())
+				Expect(err).To(Succeed())
 
-				if hook.GOOS == "windows" {
+				if *testOS == "windows" {
 					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
 set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
 set DT_AGENTACTIVE=true
@@ -511,18 +570,18 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 
 			It("installs dynatrace", func() {
-				if hook.GOOS != "windows" {
+				if *testOS != "windows" {
 					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
 				}
 
-				err = hook.AfterCompile(stager)
-				Expect(err).To(BeNil())
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(Succeed())
 
 				// Sets up profile.d
 				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
-				Expect(err).To(BeNil())
+				Expect(err).To(Succeed())
 
-				if hook.GOOS == "windows" {
+				if *testOS == "windows" {
 					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
 set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
 set DT_AGENTACTIVE=true
@@ -553,18 +612,18 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 
 			It("installs dynatrace", func() {
-				if hook.GOOS != "windows" {
+				if *testOS != "windows" {
 					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
 				}
 
-				err = hook.AfterCompile(stager)
-				Expect(err).To(BeNil())
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(Succeed())
 
 				// Sets up profile.d
 				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
-				Expect(err).To(BeNil())
+				Expect(err).To(Succeed())
 
-				if hook.GOOS == "windows" {
+				if *testOS == "windows" {
 					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
 set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
 set DT_AGENTACTIVE=true
@@ -598,18 +657,18 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 
 			It("installs dynatrace", func() {
-				if hook.GOOS != "windows" {
+				if *testOS != "windows" {
 					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
 				}
 
-				err = hook.AfterCompile(stager)
-				Expect(err).To(BeNil())
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(Succeed())
 
 				// Sets up profile.d
 				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
-				Expect(err).To(BeNil())
+				Expect(err).To(Succeed())
 
-				if hook.GOOS == "windows" {
+				if *testOS == "windows" {
 					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
 set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
 set DT_AGENTACTIVE=true
@@ -641,18 +700,18 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 
 			It("installs dynatrace", func() {
-				if hook.GOOS != "windows" {
+				if *testOS != "windows" {
 					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
 				}
 
-				err = hook.AfterCompile(stager)
-				Expect(err).To(BeNil())
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(Succeed())
 
 				// Sets up profile.d
 				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
-				Expect(err).To(BeNil())
+				Expect(err).To(Succeed())
 
-				if hook.GOOS == "windows" {
+				if *testOS == "windows" {
 					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
 set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
 set DT_AGENTACTIVE=true
@@ -696,18 +755,18 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 
 			It("installs dynatrace", func() {
-				if hook.GOOS != "windows" {
+				if *testOS != "windows" {
 					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
 				}
 
-				err = hook.AfterCompile(stager)
-				Expect(err).To(BeNil())
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(Succeed())
 
 				// Sets up profile.d
 				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
-				Expect(err).To(BeNil())
+				Expect(err).To(Succeed())
 
-				if hook.GOOS == "windows" {
+				if *testOS == "windows" {
 					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
 set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
 set DT_AGENTACTIVE=true
@@ -724,6 +783,27 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 		})
 
+		Context("VCAP_SERVICES contains dynatrace service and all download retries fail without skiperrors", func() {
+			BeforeEach(func() {
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Setenv("VCAP_SERVICES", `{
+					"0": [{"name":"dynatrace","credentials":{"apiurl":"https://example.com","apitoken":"`+apiToken+`","environmentid":"`+environmentID+`"}}]
+				}`)
+
+				// MaxDownloadRetries is already 0 (set in outer BeforeEach), so the
+				// download fails immediately on the first attempt without any sleep.
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/"+OSName+"/"+InstallationMethod+"/latest?bitness=64&include=nginx&include=process&include=dotnet",
+					httpmock.NewStringResponder(503, `{"error": "Service unavailable"}`))
+			})
+
+			It("returns an error after exhausting all retries", func() {
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(MatchError(ContainSubstring("download returned with status 503")))
+
+				Expect(buffer.String()).To(ContainSubstring("Maximum number of retries attempted: 0"))
+			})
+		})
+
 		Context("VCAP_SERVICES contains second dynatrace service with credentials", func() {
 			BeforeEach(func() {
 				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
@@ -734,8 +814,8 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 
 			It("does nothing and succeeds", func() {
-				err = hook.AfterCompile(stager)
-				Expect(err).To(BeNil())
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(Succeed())
 
 				Expect(buffer.String()).To(ContainSubstring("More than one matching service found!"))
 			})
@@ -753,17 +833,17 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 
 			It("installs dynatrace", func() {
-				if hook.GOOS != "windows" {
+				if *testOS != "windows" {
 					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
 				}
 
-				Expect(hook.AfterCompile(stager)).Should(Succeed())
+				Expect(hook.injectDynatrace(stager, *testOS)).To(Succeed())
 
 				// Sets up profile.d
 				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
-				Expect(err).Should(Succeed())
+				Expect(err).To(Succeed())
 
-				if hook.GOOS == "windows" {
+				if *testOS == "windows" {
 					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
 set COR_PROFILER={B7038F67-52FC-4DA2-AB02-969B3C1EDA03}
 set DT_AGENTACTIVE=true
@@ -795,8 +875,8 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 
 			It("does nothing and succeeds", func() {
-				err = hook.AfterCompile(stager)
-				Expect(err).To(BeNil())
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(Succeed())
 
 				Expect(buffer.String()).To(ContainSubstring("Download returned with status 404"))
 				Expect(buffer.String()).To(ContainSubstring("Error during installer download, skipping installation"))
@@ -821,12 +901,12 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 
 			It("installs dynatrace and deletes FIPS flag file", func() {
-				if hook.GOOS != "windows" {
+				if *testOS != "windows" {
 					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
 				}
 
-				err = hook.AfterCompile(stager)
-				Expect(err).To(BeNil())
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(Succeed())
 
 				_, err := os.Stat(filepath.Join(buildDir, "agent/dt_fips_disabled.flag"))
 				Expect(err).To(Not(BeNil()))
@@ -849,11 +929,11 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 
 			It("installs dynatrace with additional code modules", func() {
-				if hook.GOOS != "windows" {
+				if *testOS != "windows" {
 					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
 				}
-				err = hook.AfterCompile(stager)
-				Expect(err).To(BeNil())
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(Succeed())
 
 				Expect(buffer.String()).To(ContainSubstring("Adding additional code module to download: go"))
 				Expect(buffer.String()).To(ContainSubstring("Adding additional code module to download: nodejs"))
@@ -876,7 +956,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 
 				vcapFile = filepath.Join(buildDir, "vcap_services.json")
 				err = os.WriteFile(vcapFile, []byte(vcapContent), 0644)
-				Expect(err).To(BeNil())
+				Expect(err).To(Succeed())
 
 				os.Setenv("VCAP_SERVICES_FILE_PATH", vcapFile)
 
@@ -888,14 +968,32 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 
 			It("loads credentials from file and installs dynatrace", func() {
-				if hook.GOOS != "windows" {
+				if *testOS != "windows" {
 					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
 				}
 
-				err = hook.AfterCompile(stager)
-				Expect(err).To(BeNil())
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(Succeed())
 
 				Expect(buffer.String()).To(ContainSubstring("Loading VCAP services from file: " + vcapFile))
+			})
+		})
+
+		Context("VCAP_SERVICES_FILE_PATH is set to empty string", func() {
+			BeforeEach(func() {
+				os.Setenv("BP_DEBUG", "true")
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Setenv("VCAP_SERVICES", `{
+					"0": [{"name":"dynatrace","credentials":{"apiurl":"https://example.com","apitoken":"`+apiToken+`","environmentid":"`+environmentID+`"}}]
+				}`)
+				os.Setenv("VCAP_SERVICES_FILE_PATH", "")
+			})
+
+			It("does nothing and succeeds, logging that the variable is set but empty", func() {
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(Succeed())
+
+				Expect(buffer.String()).To(ContainSubstring("VCAP_SERVICES_FILE_PATH is set but empty"))
 			})
 		})
 
@@ -909,8 +1007,8 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 
 			It("does nothing and succeeds with error log", func() {
-				err = hook.AfterCompile(stager)
-				Expect(err).To(BeNil())
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(Succeed())
 
 				Expect(buffer.String()).To(ContainSubstring("Failed to read VCAP services file /nonexistent/path/vcap_services.json"))
 			})
@@ -924,14 +1022,14 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 
 				vcapFile := filepath.Join(buildDir, "vcap_services_invalid.json")
 				err = os.WriteFile(vcapFile, []byte("not valid json"), 0644)
-				Expect(err).To(BeNil())
+				Expect(err).To(Succeed())
 
 				os.Setenv("VCAP_SERVICES_FILE_PATH", vcapFile)
 			})
 
 			It("does nothing and succeeds with debug log for unmarshal failure", func() {
-				err = hook.AfterCompile(stager)
-				Expect(err).To(BeNil())
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(Succeed())
 
 				Expect(buffer.String()).To(ContainSubstring("Failed to unmarshal VCAP_SERVICES:"))
 			})
@@ -947,86 +1045,37 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 
 				vcapFile = filepath.Join(buildDir, "vcap_services_empty.json")
 				err = os.WriteFile(vcapFile, []byte("{}"), 0644)
-				Expect(err).To(BeNil())
+				Expect(err).To(Succeed())
 
 				os.Setenv("VCAP_SERVICES_FILE_PATH", vcapFile)
 			})
 
 			It("does nothing and succeeds", func() {
-				err = hook.AfterCompile(stager)
-				Expect(err).To(BeNil())
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(Succeed())
 
 				Expect(buffer.String()).To(ContainSubstring("Loading VCAP services from file: " + vcapFile))
 			})
 		})
 
-		Context("VCAP_SERVICES_FILE_PATH takes precedence over VCAP_SERVICES env var", func() {
-			var vcapFile string
-
+		Context("VCAP_SERVICES_FILE_PATH points to a zero-byte file", func() {
 			BeforeEach(func() {
 				os.Setenv("BP_DEBUG", "true")
 				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Setenv("VCAP_SERVICES", "{}")
 
-				// Env var has a different (non-dynatrace) service
-				os.Setenv("VCAP_SERVICES", `{"0": [{"name":"mysql"}]}`)
-
-				// File has the dynatrace service
-				vcapContent := `{
-					"0": [{"name":"dynatrace","credentials":{"apiurl":"https://example.com","apitoken":"` + apiToken + `","environmentid":"` + environmentID + `"}}]
-				}`
-
-				vcapFile = filepath.Join(buildDir, "vcap_services_precedence.json")
-				err = os.WriteFile(vcapFile, []byte(vcapContent), 0644)
-				Expect(err).To(BeNil())
+				vcapFile := filepath.Join(buildDir, "vcap_services_zerobyte.json")
+				err = os.WriteFile(vcapFile, []byte{}, 0644)
+				Expect(err).To(Succeed())
 
 				os.Setenv("VCAP_SERVICES_FILE_PATH", vcapFile)
-
-				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/"+OSName+"/"+InstallationMethod+"/latest?bitness=64&include=nginx&include=process&include=dotnet",
-					api_header_check)
-
-				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/processmoduleconfig",
-					api_header_check)
 			})
 
-			It("uses file content and ignores env var", func() {
-				if hook.GOOS != "windows" {
-					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
-				}
+			It("does nothing and succeeds with debug log for unmarshal failure", func() {
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(Succeed())
 
-				err = hook.AfterCompile(stager)
-				Expect(err).To(BeNil())
-
-				Expect(buffer.String()).To(ContainSubstring("Both VCAP_SERVICES_FILE_PATH and VCAP_SERVICES are set, using file: " + vcapFile))
-				Expect(buffer.String()).To(ContainSubstring("Loading VCAP services from file: " + vcapFile))
-				Expect(buffer.String()).NotTo(ContainSubstring("Loading VCAP services from environment variable"))
-			})
-		})
-
-		Context("VCAP_SERVICES_FILE_PATH is empty string with VCAP_SERVICES set", func() {
-			BeforeEach(func() {
-				os.Setenv("BP_DEBUG", "true")
-				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
-				os.Setenv("VCAP_SERVICES", `{
-					"0": [{"name":"dynatrace","credentials":{"apiurl":"https://example.com","apitoken":"`+apiToken+`","environmentid":"`+environmentID+`"}}]
-				}`)
-				os.Setenv("VCAP_SERVICES_FILE_PATH", "")
-
-				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/"+OSName+"/"+InstallationMethod+"/latest?bitness=64&include=nginx&include=process&include=dotnet",
-					api_header_check)
-
-				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/processmoduleconfig",
-					api_header_check)
-			})
-
-			It("warns about empty path and falls back to env var", func() {
-				if hook.GOOS != "windows" {
-					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
-				}
-
-				err = hook.AfterCompile(stager)
-				Expect(err).To(BeNil())
-
-				Expect(buffer.String()).To(ContainSubstring("VCAP_SERVICES_FILE_PATH is set but empty, falling back to VCAP_SERVICES environment variable"))
+				Expect(buffer.String()).To(ContainSubstring("Failed to unmarshal VCAP_SERVICES:"))
 			})
 		})
 
@@ -1038,8 +1087,8 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 
 			It("does nothing and succeeds", func() {
-				err = hook.AfterCompile(stager)
-				Expect(err).To(BeNil())
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(Succeed())
 
 				Expect(buffer.String()).To(Equal(""))
 			})
