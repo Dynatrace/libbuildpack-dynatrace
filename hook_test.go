@@ -48,6 +48,16 @@ const manifestJson = `{
 					"binarytype" : "primary"
 				}
 			]
+		},
+		"dotnet" : {
+			"windows-x86-64" : [
+				{
+					"path" : "agent/bin/current/windows-x86-64/oneagentdotnet.dll",
+					"md5" : "2bf4ba9e90e2589428f6f6f3a964cba2",
+					"version" : "1.130.0.20170914-125024",
+					"binarytype" : "primary"
+				}
+			]
 		}
 	}
 }`
@@ -73,13 +83,13 @@ var _ = Describe("dynatraceHook", func() {
 
 	BeforeEach(func() {
 		bpDir, err = os.MkdirTemp("", "libbuildpack-dynatrace.buildpack.")
-		Expect(err).To(Succeed())
+		Expect(err).To(BeNil())
 
 		buildDir, err = os.MkdirTemp("", "libbuildpack-dynatrace.build.")
-		Expect(err).To(Succeed())
+		Expect(err).To(BeNil())
 
 		depsDir, err = os.MkdirTemp("", "libbuildpack-dynatrace.deps.")
-		Expect(err).To(Succeed())
+		Expect(err).To(BeNil())
 
 		depsIdx = "07"
 		err = os.MkdirAll(filepath.Join(depsDir, depsIdx), 0755)
@@ -119,21 +129,21 @@ var _ = Describe("dynatraceHook", func() {
 
 		simulateUnixInstaller = func(_ string, _, _ io.Writer, file string, _ string) {
 			contents, err := os.ReadFile(file)
-			Expect(err).To(Succeed())
+			Expect(err).To(BeNil())
 
 			Expect(string(contents)).To(Equal("echo Install Dynatrace"))
 
 			err = os.MkdirAll(filepath.Join(buildDir, "dynatrace/oneagent/agent/lib64"), 0755)
-			Expect(err).To(Succeed())
+			Expect(err).To(BeNil())
 
 			err = os.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/agent/lib64/liboneagentproc.so"), []byte("library"), 0644)
-			Expect(err).To(Succeed())
+			Expect(err).To(BeNil())
 
 			err = os.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/dynatrace-env.sh"), []byte("echo running dynatrace-env.sh"), 0644)
-			Expect(err).To(Succeed())
+			Expect(err).To(BeNil())
 
 			err = os.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/manifest.json"), []byte(manifestJson), 0664)
-			Expect(err).To(Succeed())
+			Expect(err).To(BeNil())
 
 			ruxitagentproc := `
 			[section1]
@@ -145,13 +155,13 @@ var _ = Describe("dynatraceHook", func() {
 			key4=val4`
 
 			err = os.MkdirAll(filepath.Join(buildDir, "dynatrace/oneagent/agent/conf"), 0755)
-			Expect(err).To(Succeed())
+			Expect(err).To(BeNil())
 
 			err = os.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/agent/conf/ruxitagentproc.conf"), []byte(ruxitagentproc), 0664)
-			Expect(err).To(Succeed())
+			Expect(err).To(BeNil())
 
 			err = os.WriteFile(filepath.Join(buildDir, "dynatrace/oneagent/agent/dt_fips_disabled.flag"), []byte(""), 0664)
-			Expect(err).To(Succeed())
+			Expect(err).To(BeNil())
 		}
 	})
 
@@ -159,7 +169,7 @@ var _ = Describe("dynatraceHook", func() {
 		args := []string{buildDir, "", depsDir, depsIdx}
 
 		manifest, err := libbuildpack.NewManifest(bpDir, logger, time.Now())
-		Expect(err).To(Succeed())
+		Expect(err).To(BeNil())
 
 		stager = libbuildpack.NewStager(args, logger, manifest)
 	})
@@ -168,13 +178,13 @@ var _ = Describe("dynatraceHook", func() {
 		mockCtrl.Finish()
 
 		err = os.RemoveAll(buildDir)
-		Expect(err).To(Succeed())
+		Expect(err).To(BeNil())
 
 		err = os.RemoveAll(bpDir)
-		Expect(err).To(Succeed())
+		Expect(err).To(BeNil())
 
 		err = os.RemoveAll(depsDir)
-		Expect(err).To(Succeed())
+		Expect(err).To(BeNil())
 	})
 
 	Describe("AfterCompile", func() {
@@ -215,7 +225,7 @@ var _ = Describe("dynatraceHook", func() {
 
 			It("does nothing and succeeds", func() {
 				err = hook.injectDynatrace(stager, *testOS)
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				Expect(buffer.String()).To(Equal(""))
 			})
@@ -232,7 +242,7 @@ var _ = Describe("dynatraceHook", func() {
 
 			It("does nothing and succeeds", func() {
 				err = hook.injectDynatrace(stager, *testOS)
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				Expect(buffer.String()).To(Equal(""))
 			})
@@ -247,7 +257,7 @@ var _ = Describe("dynatraceHook", func() {
 
 			It("does nothing and succeeds with debug log for unmarshal failure", func() {
 				err = hook.injectDynatrace(stager, *testOS)
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				Expect(buffer.String()).To(ContainSubstring("Failed to unmarshal VCAP_SERVICES:"))
 			})
@@ -263,7 +273,7 @@ var _ = Describe("dynatraceHook", func() {
 
 			It("does nothing and succeeds", func() {
 				err = hook.injectDynatrace(stager, *testOS)
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				Expect(buffer.String()).To(Equal(""))
 			})
@@ -281,7 +291,7 @@ var _ = Describe("dynatraceHook", func() {
 
 			It("does nothing and succeeds", func() {
 				err = hook.injectDynatrace(stager, *testOS)
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				Expect(buffer.String()).Should(ContainSubstring("Incomplete credentials for service"))
 			})
@@ -299,7 +309,7 @@ var _ = Describe("dynatraceHook", func() {
 
 			It("does nothing and succeeds", func() {
 				err = hook.injectDynatrace(stager, *testOS)
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				Expect(buffer.String()).To(Equal(""))
 			})
@@ -343,11 +353,11 @@ var _ = Describe("dynatraceHook", func() {
 				}
 
 				err = hook.injectDynatrace(stager, *testOS)
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				// Sets up profile.d
 				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				if *testOS == "windows" {
 					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
@@ -391,11 +401,11 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				}
 
 				err = hook.injectDynatrace(stager, *testOS)
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				// Sets up profile.d
 				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				if *testOS == "windows" {
 					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
@@ -440,7 +450,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				}
 
 				err = hook.injectDynatrace(stager, *testOS)
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				Expect(buffer.String()).To(ContainSubstring("Loading VCAP services from environment variable VCAP_SERVICES"))
 			})
@@ -468,20 +478,20 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				}
 
 				err = hook.injectDynatrace(stager, *testOS)
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				Expect(buffer.String()).To(ContainSubstring("Failed to fetch updated OneAgent config from the API"))
 
 				// Check for comment in ruxitagentproc.conf
 				contents, err := os.ReadFile(filepath.Join(buildDir, "dynatrace/oneagent/agent/conf/ruxitagentproc.conf"))
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				warn_string := "# Warning: Failed to fetch updated OneAgent config from the API. This config only includes settings provided by the installer."
 				Expect(strings.Contains(string(contents), warn_string)).To(BeTrue())
 
 				// Sets up profile.d
 				contents, err = os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				if *testOS == "windows" {
 					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
@@ -524,19 +534,19 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				}
 
 				err = hook.injectDynatrace(stager, *testOS)
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				Expect(buffer.String()).To(ContainSubstring("Successfully fetched updated OneAgent config from the API"))
 
 				// Check for comment in ruxitagentproc.conf
 				contents, err := os.ReadFile(filepath.Join(buildDir, "dynatrace", "oneagent", "agent", "conf", "ruxitagentproc.conf"))
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 				configComment := "# This config is a merge between the installer and the Cluster config"
 				Expect(strings.Contains(string(contents), configComment)).To(BeTrue())
 
 				// Sets up profile.d
 				contents, err = os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				if *testOS == "windows" {
 					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
@@ -575,11 +585,11 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				}
 
 				err = hook.injectDynatrace(stager, *testOS)
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				// Sets up profile.d
 				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				if *testOS == "windows" {
 					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
@@ -617,11 +627,11 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				}
 
 				err = hook.injectDynatrace(stager, *testOS)
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				// Sets up profile.d
 				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				if *testOS == "windows" {
 					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
@@ -662,11 +672,11 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				}
 
 				err = hook.injectDynatrace(stager, *testOS)
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				// Sets up profile.d
 				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				if *testOS == "windows" {
 					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
@@ -705,11 +715,11 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				}
 
 				err = hook.injectDynatrace(stager, *testOS)
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				// Sets up profile.d
 				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				if *testOS == "windows" {
 					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
@@ -760,11 +770,11 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				}
 
 				err = hook.injectDynatrace(stager, *testOS)
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				// Sets up profile.d
 				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				if *testOS == "windows" {
 					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
@@ -815,7 +825,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 
 			It("does nothing and succeeds", func() {
 				err = hook.injectDynatrace(stager, *testOS)
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				Expect(buffer.String()).To(ContainSubstring("More than one matching service found!"))
 			})
@@ -837,11 +847,11 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
 				}
 
-				Expect(hook.injectDynatrace(stager, *testOS)).To(Succeed())
+				Expect(hook.injectDynatrace(stager, *testOS)).Should(Succeed())
 
 				// Sets up profile.d
 				contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
-				Expect(err).To(Succeed())
+				Expect(err).Should(Succeed())
 
 				if *testOS == "windows" {
 					Expect(string(contents)).To(Equal(`set COR_ENABLE_PROFILING=1
@@ -876,7 +886,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 
 			It("does nothing and succeeds", func() {
 				err = hook.injectDynatrace(stager, *testOS)
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				Expect(buffer.String()).To(ContainSubstring("Download returned with status 404"))
 				Expect(buffer.String()).To(ContainSubstring("Error during installer download, skipping installation"))
@@ -906,7 +916,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				}
 
 				err = hook.injectDynatrace(stager, *testOS)
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				_, err := os.Stat(filepath.Join(buildDir, "agent/dt_fips_disabled.flag"))
 				Expect(err).To(Not(BeNil()))
@@ -933,7 +943,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
 				}
 				err = hook.injectDynatrace(stager, *testOS)
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				Expect(buffer.String()).To(ContainSubstring("Adding additional code module to download: go"))
 				Expect(buffer.String()).To(ContainSubstring("Adding additional code module to download: nodejs"))
@@ -956,7 +966,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 
 				vcapFile = filepath.Join(buildDir, "vcap_services.json")
 				err = os.WriteFile(vcapFile, []byte(vcapContent), 0644)
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				os.Setenv("VCAP_SERVICES_FILE_PATH", vcapFile)
 
@@ -973,7 +983,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				}
 
 				err = hook.injectDynatrace(stager, *testOS)
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				Expect(buffer.String()).To(ContainSubstring("Loading VCAP services from file: " + vcapFile))
 			})
@@ -991,7 +1001,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 
 			It("does nothing and succeeds, logging that the variable is set but empty", func() {
 				err = hook.injectDynatrace(stager, *testOS)
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				Expect(buffer.String()).To(ContainSubstring("VCAP_SERVICES_FILE_PATH is set but empty"))
 			})
@@ -1008,7 +1018,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 
 			It("does nothing and succeeds with error log", func() {
 				err = hook.injectDynatrace(stager, *testOS)
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				Expect(buffer.String()).To(ContainSubstring("Failed to read VCAP services file /nonexistent/path/vcap_services.json"))
 			})
@@ -1022,14 +1032,14 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 
 				vcapFile := filepath.Join(buildDir, "vcap_services_invalid.json")
 				err = os.WriteFile(vcapFile, []byte("not valid json"), 0644)
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				os.Setenv("VCAP_SERVICES_FILE_PATH", vcapFile)
 			})
 
 			It("does nothing and succeeds with debug log for unmarshal failure", func() {
 				err = hook.injectDynatrace(stager, *testOS)
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				Expect(buffer.String()).To(ContainSubstring("Failed to unmarshal VCAP_SERVICES:"))
 			})
@@ -1045,14 +1055,14 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 
 				vcapFile = filepath.Join(buildDir, "vcap_services_empty.json")
 				err = os.WriteFile(vcapFile, []byte("{}"), 0644)
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				os.Setenv("VCAP_SERVICES_FILE_PATH", vcapFile)
 			})
 
 			It("does nothing and succeeds", func() {
 				err = hook.injectDynatrace(stager, *testOS)
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				Expect(buffer.String()).To(ContainSubstring("Loading VCAP services from file: " + vcapFile))
 			})
@@ -1066,14 +1076,14 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 
 				vcapFile := filepath.Join(buildDir, "vcap_services_zerobyte.json")
 				err = os.WriteFile(vcapFile, []byte{}, 0644)
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				os.Setenv("VCAP_SERVICES_FILE_PATH", vcapFile)
 			})
 
 			It("does nothing and succeeds with debug log for unmarshal failure", func() {
 				err = hook.injectDynatrace(stager, *testOS)
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				Expect(buffer.String()).To(ContainSubstring("Failed to unmarshal VCAP_SERVICES:"))
 			})
@@ -1088,7 +1098,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 
 			It("does nothing and succeeds", func() {
 				err = hook.injectDynatrace(stager, *testOS)
-				Expect(err).To(Succeed())
+				Expect(err).To(BeNil())
 
 				Expect(buffer.String()).To(Equal(""))
 			})

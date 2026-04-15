@@ -2,9 +2,7 @@ package dynatrace
 
 import (
 	"archive/zip"
-	"bufio"
 	"bytes"
-	"flag"
 	"net/http"
 	"runtime"
 
@@ -12,10 +10,9 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-// testOS can be overridden on the command line to test against a different OS:
-//
-//	go test ./... -os=windows
-var testOS = flag.String("os", defaultTestOS(), "operating system to simulate in tests (linux or windows)")
+// testOS returns the operating system to simulate in tests, based on the host OS.
+// Windows-specific path handling (backslash separators, os.Stat) only works on actual Windows.
+var testOS = func() *string { s := defaultTestOS(); return &s }()
 
 func defaultTestOS() string {
 	if runtime.GOOS == "windows" {
@@ -52,7 +49,7 @@ func getMockResponse() *http.Response {
 
 func getWindowsMockResponse() *http.Response {
 	var zipBytes bytes.Buffer
-	zipWriter := zip.NewWriter(bufio.NewWriter(&zipBytes))
+	zipWriter := zip.NewWriter(&zipBytes)
 	writer, _ := zipWriter.Create("agent/bin/current/windows-x86-64/oneagentdotnet.dll")
 	writer.Write([]byte("library"))
 	writer, _ = zipWriter.Create("agent/conf/ruxitagentproc.conf")
