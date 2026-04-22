@@ -189,28 +189,44 @@ var _ = Describe("dynatraceHook", func() {
 
 	Describe("AfterCompile", func() {
 		var (
-			oldVcapApplication  string
-			oldVcapServices     string
-			oldBpDebug          string
-			oldVcapServicesFile string
+			oldVcapApplication     string
+			oldVcapApplicationSet  bool
+			oldVcapServices        string
+			oldVcapServicesSet     bool
+			oldBpDebug             string
+			oldBpDebugSet          bool
+			oldVcapServicesFile    string
+			oldVcapServicesFileSet bool
 
 			environmentID string
 			apiToken      string
 		)
 		BeforeEach(func() {
-			oldVcapApplication = os.Getenv("VCAP_APPLICATION")
-			oldVcapServices = os.Getenv("VCAP_SERVICES")
-			oldBpDebug = os.Getenv("BP_DEBUG")
-			oldVcapServicesFile = os.Getenv("VCAP_SERVICES_FILE_PATH")
+			oldVcapApplication, oldVcapApplicationSet = os.LookupEnv("VCAP_APPLICATION")
+			oldVcapServices, oldVcapServicesSet = os.LookupEnv("VCAP_SERVICES")
+			oldBpDebug, oldBpDebugSet = os.LookupEnv("BP_DEBUG")
+			oldVcapServicesFile, oldVcapServicesFileSet = os.LookupEnv("VCAP_SERVICES_FILE_PATH")
 			os.Unsetenv("VCAP_SERVICES_FILE_PATH")
 			environmentID = "123456"
 			apiToken = "ExcitingToken28"
 		})
 		AfterEach(func() {
-			os.Setenv("VCAP_APPLICATION", oldVcapApplication)
-			os.Setenv("VCAP_SERVICES", oldVcapServices)
-			os.Setenv("BP_DEBUG", oldBpDebug)
-			if oldVcapServicesFile != "" {
+			if oldVcapApplicationSet {
+				os.Setenv("VCAP_APPLICATION", oldVcapApplication)
+			} else {
+				os.Unsetenv("VCAP_APPLICATION")
+			}
+			if oldVcapServicesSet {
+				os.Setenv("VCAP_SERVICES", oldVcapServices)
+			} else {
+				os.Unsetenv("VCAP_SERVICES")
+			}
+			if oldBpDebugSet {
+				os.Setenv("BP_DEBUG", oldBpDebug)
+			} else {
+				os.Unsetenv("BP_DEBUG")
+			}
+			if oldVcapServicesFileSet {
 				os.Setenv("VCAP_SERVICES_FILE_PATH", oldVcapServicesFile)
 			} else {
 				os.Unsetenv("VCAP_SERVICES_FILE_PATH")
@@ -956,7 +972,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			BeforeEach(func() {
 				os.Setenv("BP_DEBUG", "true")
 				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
-				os.Setenv("VCAP_SERVICES", "{}")
+				os.Unsetenv("VCAP_SERVICES")
 
 				vcapContent := `{
 					"0": [{"name":"mysql"}],
@@ -993,9 +1009,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			BeforeEach(func() {
 				os.Setenv("BP_DEBUG", "true")
 				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
-				os.Setenv("VCAP_SERVICES", `{
-					"0": [{"name":"dynatrace","credentials":{"apiurl":"https://example.com","apitoken":"`+apiToken+`","environmentid":"`+environmentID+`"}}]
-				}`)
+				os.Unsetenv("VCAP_SERVICES")
 				os.Setenv("VCAP_SERVICES_FILE_PATH", "")
 			})
 
@@ -1010,9 +1024,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 		Context("VCAP_SERVICES_FILE_PATH points to non-existent file", func() {
 			BeforeEach(func() {
 				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
-				os.Setenv("VCAP_SERVICES", `{
-					"0": [{"name":"dynatrace","credentials":{"apiurl":"https://example.com","apitoken":"`+apiToken+`","environmentid":"`+environmentID+`"}}]
-				}`)
+				os.Unsetenv("VCAP_SERVICES")
 				os.Setenv("VCAP_SERVICES_FILE_PATH", "/nonexistent/path/vcap_services.json")
 			})
 
@@ -1028,7 +1040,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			BeforeEach(func() {
 				os.Setenv("BP_DEBUG", "true")
 				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
-				os.Setenv("VCAP_SERVICES", "{}")
+				os.Unsetenv("VCAP_SERVICES")
 
 				vcapFile := filepath.Join(buildDir, "vcap_services_invalid.json")
 				err = os.WriteFile(vcapFile, []byte("not valid json"), 0644)
@@ -1051,7 +1063,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			BeforeEach(func() {
 				os.Setenv("BP_DEBUG", "true")
 				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
-				os.Setenv("VCAP_SERVICES", "{}")
+				os.Unsetenv("VCAP_SERVICES")
 
 				vcapFile = filepath.Join(buildDir, "vcap_services_empty.json")
 				err = os.WriteFile(vcapFile, []byte("{}"), 0644)
@@ -1060,11 +1072,12 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 				os.Setenv("VCAP_SERVICES_FILE_PATH", vcapFile)
 			})
 
-			It("does nothing and succeeds", func() {
+			It("does nothing and succeeds with debug log for no credentials found", func() {
 				err = hook.injectDynatrace(stager, *testOS)
 				Expect(err).To(BeNil())
 
 				Expect(buffer.String()).To(ContainSubstring("Loading VCAP services from file: " + vcapFile))
+				Expect(buffer.String()).To(ContainSubstring("Dynatrace service credentials not found!"))
 			})
 		})
 
@@ -1072,7 +1085,7 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			BeforeEach(func() {
 				os.Setenv("BP_DEBUG", "true")
 				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
-				os.Setenv("VCAP_SERVICES", "{}")
+				os.Unsetenv("VCAP_SERVICES")
 
 				vcapFile := filepath.Join(buildDir, "vcap_services_zerobyte.json")
 				err = os.WriteFile(vcapFile, []byte{}, 0644)
@@ -1093,14 +1106,14 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			BeforeEach(func() {
 				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
 				os.Unsetenv("VCAP_SERVICES_FILE_PATH")
-				os.Setenv("VCAP_SERVICES", "")
+				os.Unsetenv("VCAP_SERVICES")
 			})
 
 			It("does nothing and succeeds", func() {
 				err = hook.injectDynatrace(stager, *testOS)
 				Expect(err).To(BeNil())
 
-				Expect(buffer.String()).To(Equal(""))
+				Expect(buffer.String()).To(ContainSubstring("Dynatrace service credentials not found!"))
 			})
 		})
 	})

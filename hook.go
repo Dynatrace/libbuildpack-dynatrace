@@ -70,6 +70,7 @@ func (h *Hook) AfterCompile(stager *libbuildpack.Stager) error {
 
 }
 
+// injectDynatrace is an indirection to get rid of the tight coupling to the underlying operating system 
 func (h *Hook) injectDynatrace(stager *libbuildpack.Stager, operatingSystem string) error {
 	var err error
 
@@ -151,21 +152,24 @@ func (h *Hook) loadVCAPServicesData() []byte {
 			return nil
 		}
 
-		data, err := os.ReadFile(filePath)
+		h.Log.Debug("Loading VCAP services from file: %s", filePath)
+		fileContent, err := os.ReadFile(filePath)
 		if err != nil {
 			h.Log.Error("Failed to read VCAP services file %s: %s", filePath, err)
 			return nil
 		}
-		h.Log.Debug("Loading VCAP services from file: %s", filePath)
-		return data
+		h.Log.Debug("Successfully read VCAP Service data.")
+		return fileContent
 
 	}
 
+	h.Log.Debug("Loading VCAP services from environment variable VCAP_SERVICES")
 	envData := os.Getenv("VCAP_SERVICES")
 	if envData == "" {
+		h.Log.Debug("Environment variable VCAP_SERVICES is not set or empty")
 		return nil
 	}
-	h.Log.Debug("Loading VCAP services from environment variable VCAP_SERVICES")
+	h.Log.Debug("Successfully read VCAP Service data from environment variable.")
 	return []byte(envData)
 }
 
