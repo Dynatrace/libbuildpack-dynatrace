@@ -206,7 +206,7 @@ var _ = Describe("dynatraceHook", func() {
 			oldVcapServices, oldVcapServicesSet = os.LookupEnv("VCAP_SERVICES")
 			oldBpDebug, oldBpDebugSet = os.LookupEnv("BP_DEBUG")
 			oldVcapServicesFile, oldVcapServicesFileSet = os.LookupEnv("VCAP_SERVICES_FILE_PATH")
-			os.Unsetenv("VCAP_SERVICES_FILE_PATH")
+			os.Unsetenv("VCAP_SERVICES_FILE_PATH") // unsetting is necessary to make this work test environments that have this variable set. If so that would lead to a test failure as the wrong code-path is used.
 			environmentID = "123456"
 			apiToken = "ExcitingToken28"
 		})
