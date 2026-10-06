@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -36,6 +37,7 @@ type credentials struct {
 	NetworkZone       string
 	EnableFIPS        bool
 	AddTechnologies   string
+	RemoveTechnologies string
 }
 
 // Hook implements libbuildpack.Hook. It downloads and install the Dynatrace OneAgent.
@@ -218,6 +220,7 @@ func (h *Hook) getCredentials() *credentials {
 				NetworkZone:       queryString("networkzone"),
 				EnableFIPS:        queryString("enablefips") == "true",
 				AddTechnologies:   queryString("addtechnologies"),
+				RemoveTechnologies:   queryString("removetechnologies"),
 			}
 
 			if (creds.EnvironmentID != "" && creds.APIToken != "") || creds.CustomOneAgentURL != "" {
@@ -340,9 +343,25 @@ func (h *Hook) getDownloadURL(c *credentials, operatingSystem string) string {
 	if c.NetworkZone != "" {
 		qv.Add("networkZone", c.NetworkZone)
 	}
+
+	keepTech := []string{}
+	if c.RemoveTechnologies != "" {
+		// remove configured OneAgent code modules, except 'process'
+		remove := strings.Split(c.RemoveTechnologies, ",")
+		for _, tech := range h.IncludeTechnologies {
+			if tech == "process" || !slices.Contains(remove, tech) {
+				keepTech = append(keepTech, tech)
+			} else {
+				h.Log.Debug("Removing code module from download: %s", tech)
+			}
+		}
+		h.IncludeTechnologies = keepTech
+	}
+
 	for _, t := range h.IncludeTechnologies {
 		qv.Add("include", t)
 	}
+
 	if c.AddTechnologies != "" {
 		// add optionally configured OneAgent code modules
 		for _, t := range strings.Split(c.AddTechnologies, ",") {
@@ -350,6 +369,7 @@ func (h *Hook) getDownloadURL(c *credentials, operatingSystem string) string {
 			qv.Add("include", t)
 		}
 	}
+
 	u.RawQuery = qv.Encode() // Parameters will be sorted by key.
 
 	return u.String()
