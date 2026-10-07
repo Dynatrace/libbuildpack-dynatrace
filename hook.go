@@ -210,15 +210,31 @@ func (h *Hook) getCredentials() *credentials {
 				return ""
 			}
 
+			// queryBool reads a flag that may be supplied either as a JSON
+			// boolean (e.g. "skiperrors": true) or as a string
+			// (e.g. "skiperrors": "true"). User-provided services commonly use
+			// the native boolean form, so accepting only strings here silently
+			// dropped the flag. See cloudfoundry/nginx-buildpack#431.
+			queryBool := func(key string) bool {
+				switch value := service.Credentials[key].(type) {
+				case bool:
+					return value
+				case string:
+					return value == "true"
+				default:
+					return false
+				}
+			}
+
 			creds := &credentials{
 				ServiceName:       service.Name,
 				EnvironmentID:     queryString("environmentid"),
 				APIToken:          queryString("apitoken"),
 				APIURL:            queryString("apiurl"),
 				CustomOneAgentURL: queryString("customoneagenturl"),
-				SkipErrors:        queryString("skiperrors") == "true",
+				SkipErrors:        queryBool("skiperrors"),
 				NetworkZone:       queryString("networkzone"),
-				EnableFIPS:        queryString("enablefips") == "true",
+				EnableFIPS:        queryBool("enablefips"),
 				AddTechnologies:   queryString("addtechnologies"),
 				RemoveTechnologies:   queryString("removetechnologies"),
 			}

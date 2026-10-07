@@ -909,6 +909,30 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 		})
 
+		Context("VCAP_SERVICES contains skiperrors flag as a JSON boolean", func() {
+			BeforeEach(func() {
+				os.Setenv("BP_DEBUG", "true")
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				// User-provided services commonly supply skiperrors as a native
+				// JSON boolean rather than the string "true". Regression test for
+				// cloudfoundry/nginx-buildpack#431.
+				os.Setenv("VCAP_SERVICES", `{
+					"0": [{"name":"dynatrace","credentials":{"environmentid":"`+environmentID+`","apitoken":"`+apiToken+`","skiperrors":true}}]
+				}`)
+
+				httpmock.RegisterResponder("GET", "https://"+environmentID+".live.dynatrace.com/api/v1/deployment/installer/agent/"+OSName+"/"+InstallationMethod+"/latest?bitness=64&include=nginx&include=process&include=dotnet",
+					httpmock.NewStringResponder(404, "echo agent not found"))
+			})
+
+			It("does nothing and succeeds", func() {
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(BeNil())
+
+				Expect(buffer.String()).To(ContainSubstring("Download returned with status 404"))
+				Expect(buffer.String()).To(ContainSubstring("Error during installer download, skipping installation"))
+			})
+		})
+
 		Context("FIPS enabled", func() {
 			BeforeEach(func() {
 				os.Setenv("BP_DEBUG", "true")
