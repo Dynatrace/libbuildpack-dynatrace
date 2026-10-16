@@ -38,6 +38,9 @@ type credentials struct {
 	EnableFIPS        bool
 	AddTechnologies   string
 	RemoveTechnologies string
+	Unconfigured     bool
+	TenantToken string
+	DTConnectionPoint string
 }
 
 // Hook implements libbuildpack.Hook. It downloads and install the Dynatrace OneAgent.
@@ -81,6 +84,7 @@ func (h *Hook) injectDynatrace(stager *libbuildpack.Stager, operatingSystem stri
 	// Get credentials...
 	creds := h.getCredentials()
 	if creds == nil {
+		// FIXME should we change this to a more generic error message?
 		h.Log.Debug("Dynatrace service credentials not found!")
 		return nil
 	}
@@ -221,6 +225,9 @@ func (h *Hook) getCredentials() *credentials {
 				EnableFIPS:        queryString("enablefips") == "true",
 				AddTechnologies:   queryString("addtechnologies"),
 				RemoveTechnologies:   queryString("removetechnologies"),
+				Unconfigured:   queryString("unconfigured") == "true",
+				TenantToken: queryString("tenanttoken"),
+				DTConnectionPoint: queryString("dtconnectionpoint"),
 			}
 
 			if (creds.EnvironmentID != "" && creds.APIToken != "") || creds.CustomOneAgentURL != "" {
@@ -228,6 +235,22 @@ func (h *Hook) getCredentials() *credentials {
 			} else if !(creds.EnvironmentID == "" && creds.APIToken == "") { // One of the fields is empty.
 				h.Log.Error("Incomplete credentials for service: %s, environment ID: %s, API token: %s", creds.ServiceName,
 					creds.EnvironmentID, creds.APIToken)
+			}
+
+			if creds.Unconfigured == true {
+				// FIXME make this a proper message
+				h.Log.Debug("Unconfigured agent installer flag detected")
+				// FIXME check all properties at once and give a combined error message if required
+				if creds.CustomOneAgentURL == "" {
+					h.Log.Debug("Property customoneagenturl can not be empty when unconfigured is set to true")
+					return nil
+				} else if creds.TenantToken == "" {
+					h.Log.Debug("Property tenanttoken can not be empty when unconfigured is set to true")
+					return nil
+				} else if creds.DTConnectionPoint == "" {
+					h.Log.Debug("Property dtconnectionpoint can not be empty when unconfigured is set to true")
+					return nil
+				}
 			}
 		}
 	}

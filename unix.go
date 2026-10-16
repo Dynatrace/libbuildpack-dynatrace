@@ -65,6 +65,15 @@ func (h *Hook) runInstallerUnix(installerFilePath, installDir string, creds *cre
 
 	extra := ""
 
+	if creds.Unconfigured == true {
+		h.Log.Debug("Setting up connection config for unconfigured installer...")
+		// FIXME make sure to get rid of the empty entries
+		// possibly just add a switch above that truncates the file when unconfigured is true
+		extra += fmt.Sprintf("\nexport DT_TENANT=${DT_TENANT:-%s}", creds.EnvironmentID)
+		extra += fmt.Sprintf("\nexport DT_TENANTTOKEN=${DT_TENANTTOKEN:-%s}", creds.TenantToken)
+		extra += fmt.Sprintf("\nexport DT_CONNECTION_POINT=${DT_CONNECTION_POINT:-%s}", creds.DTConnectionPoint)
+	}
+
 	h.Log.Debug("Setting LD_PRELOAD...")
 	extra += fmt.Sprintf("\nexport LD_PRELOAD=${HOME}/%s", agentLibPath)
 
