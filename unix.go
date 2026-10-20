@@ -63,7 +63,8 @@ func (h *Hook) runInstallerUnix(installerFilePath, installDir string, creds *cre
 		// existing content.
 		// FIXME nicer log message
 		h.Log.Debug("unconfigured is set to true, overwriting %s completely", dynatraceEnvPath)
-		f, err = os.OpenFile(dynatraceEnvPath, os.O_TRUNC|os.O_WRONLY, os.ModeAppend)
+		//f, err = os.OpenFile(dynatraceEnvPath, os.O_TRUNC|os.O_WRONLY, os.ModeAppend)
+		f, err = os.OpenFile(dynatraceEnvPath, os.O_APPEND|os.O_WRONLY, os.ModeAppend)
 		if err != nil {
 			return err
 		}

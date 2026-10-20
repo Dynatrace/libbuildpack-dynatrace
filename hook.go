@@ -84,7 +84,8 @@ func (h *Hook) injectDynatrace(stager *libbuildpack.Stager, operatingSystem stri
 	// Get credentials...
 	creds := h.getCredentials()
 	if creds == nil {
-		// FIXME should we change this to a more generic error message?
+		// FIXME this message is confusingly displayed when eg. unconfigured is set to true
+		// but there are dynatrace credentials configured.
 		h.Log.Debug("Dynatrace service credentials not found!")
 		return nil
 	}
@@ -496,6 +497,7 @@ func (h *Hook) updateAgentConfig(creds *credentials, installDir string, stager *
 		ver = "unknown"
 	}
 
+	// FIXME what do we do with this in the unconfigured case?
 	h.Log.Debug("Downloading updated OneAgent config from %s", agentConfigUrl)
 	req, _ := http.NewRequest("GET", agentConfigUrl, nil)
 	req.Header.Set("User-Agent", fmt.Sprintf("cf-%s-buildpack/%s", lang, ver))
