@@ -63,8 +63,7 @@ func (h *Hook) runInstallerUnix(installerFilePath, installDir string, creds *cre
 		// existing content.
 		// FIXME nicer log message
 		h.Log.Debug("unconfigured is set to true, overwriting %s completely", dynatraceEnvPath)
-		//f, err = os.OpenFile(dynatraceEnvPath, os.O_TRUNC|os.O_WRONLY, os.ModeAppend)
-		f, err = os.OpenFile(dynatraceEnvPath, os.O_APPEND|os.O_WRONLY, os.ModeAppend)
+		f, err = os.OpenFile(dynatraceEnvPath, os.O_TRUNC|os.O_WRONLY, os.ModeAppend)
 		if err != nil {
 			return err
 		}
@@ -84,9 +83,7 @@ func (h *Hook) runInstallerUnix(installerFilePath, installDir string, creds *cre
 		extra += fmt.Sprintf("\nexport DT_TENANT=${DT_TENANT:-%s}", creds.EnvironmentID)
 		extra += fmt.Sprintf("\nexport DT_TENANTTOKEN=${DT_TENANTTOKEN:-%s}", creds.TenantToken)
 		extra += fmt.Sprintf("\nexport DT_CONNECTION_POINT=${DT_CONNECTION_POINT:-\"%s\"}", creds.DTConnectionPoint)
-		h.Log.Debug("Contents of 'extra' inside unconfigured-if: %s", extra)
 	}
-	h.Log.Debug("Contents of 'extra' right after unconfigured-if: %s", extra)
 
 	h.Log.Debug("Setting LD_PRELOAD...")
 	extra += fmt.Sprintf("\nexport LD_PRELOAD=${HOME}/%s", agentLibPath)
