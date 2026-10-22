@@ -472,6 +472,63 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 		})
 
+		Context("VCAP_SERVICES contains dynatrace service with unconfigured set to true", func() {
+			BeforeEach(func() {
+				os.Setenv("BP_DEBUG", "true")
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Setenv("VCAP_SERVICES", `{
+					"0": [{"name":"dynatrace","credentials":{"environmentid":"`+environmentID+`","customoneagenturl":"https://custom.example.com/oneagent","unconfigured":true,"tenanttoken":"SecretTenantToken","dtconnectionpoint":"https://cp.example.com:443"}}]
+				}`)
+
+				httpmock.RegisterResponder("GET", "https://custom.example.com/oneagent", func(r *http.Request) (*http.Response, error) {
+					return getMockResponse(), nil
+				})
+
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/processmoduleconfig",
+					api_header_check)
+			})
+
+			It("installs dynatrace and writes the connection config into the env file", func() {
+				if *testOS != "windows" {
+					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
+				}
+
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(BeNil())
+
+				Expect(buffer.String()).To(ContainSubstring("Unconfigured agent installer flag detected"))
+
+				if *testOS != "windows" {
+					contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
+					Expect(err).To(BeNil())
+
+					Expect(string(contents)).To(Equal(`
+export DT_TENANT=${DT_TENANT:-` + environmentID + `}
+export DT_TENANTTOKEN=${DT_TENANTTOKEN:-SecretTenantToken}
+export DT_CONNECTION_POINT=${DT_CONNECTION_POINT:-"https://cp.example.com:443"}
+export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so
+export DT_LOGSTREAM=stdout
+export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"`))
+				}
+			})
+		})
+
+		Context("VCAP_SERVICES contains dynatrace service with unconfigured set to true but missing properties", func() {
+			BeforeEach(func() {
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Setenv("VCAP_SERVICES", `{
+					"0": [{"name":"dynatrace","credentials":{"environmentid":"`+environmentID+`","customoneagenturl":"https://custom.example.com/oneagent","unconfigured":true}}]
+				}`)
+			})
+
+			It("does nothing and succeeds, logging the missing properties without BP_DEBUG enabled", func() {
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(BeNil())
+
+				Expect(buffer.String()).To(ContainSubstring("Following properties can not be empty when unconfigured is set to true: tenanttoken dtconnectionpoint"))
+			})
+		})
+
 		Context("Agent config can't be fetched from the API", func() {
 			BeforeEach(func() {
 				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
