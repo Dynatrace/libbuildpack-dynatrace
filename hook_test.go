@@ -1104,9 +1104,14 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 
 		Context("Neither VCAP_SERVICES_FILE_PATH nor VCAP_SERVICES is set", func() {
 			BeforeEach(func() {
+				os.Setenv("BP_DEBUG", "true")
 				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
 				os.Unsetenv("VCAP_SERVICES_FILE_PATH")
 				os.Unsetenv("VCAP_SERVICES")
+				os.Setenv("VCAP_SERVICES", `{
+					"0": [{"name":"mysql"}],
+					"1": [{"name":"redis"}]
+				}`)
 			})
 
 			It("does nothing and succeeds", func() {
