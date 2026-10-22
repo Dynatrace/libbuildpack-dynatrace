@@ -55,30 +55,27 @@ func (h *Hook) runInstallerUnix(installerFilePath, installDir string, creds *cre
 		return err
 	}
 
-	h.Log.Debug("Open %s for modification...", dynatraceEnvPath)
 	var f *os.File
+	var file_flags int
 	if creds.Unconfigured == true {
-		// when the unconfigured parameter is true, we write the whole file ourselves,
+		// When the unconfigured parameter is true, we write the whole file ourselves,
 		// therefore truncating it is the easiest way to get around parsing and replacing
 		// existing content.
-		// FIXME nicer log message
-		h.Log.Debug("unconfigured is set to true, overwriting %s completely", dynatraceEnvPath)
-		f, err = os.OpenFile(dynatraceEnvPath, os.O_TRUNC|os.O_WRONLY, os.ModeAppend)
-		if err != nil {
-			return err
-		}
+		file_flags = os.O_TRUNC|os.O_WRONLY
 	} else {
-		f, err = os.OpenFile(dynatraceEnvPath, os.O_APPEND|os.O_WRONLY, os.ModeAppend)
-		if err != nil {
-			return err
-		}
+		file_flags = os.O_APPEND|os.O_WRONLY
+	}
+	h.Log.Debug("Open %s for modification...", dynatraceEnvPath)
+	f, err = os.OpenFile(dynatraceEnvPath, file_flags, os.ModeAppend)
+	if err != nil {
+		return err
 	}
 
 	defer f.Close()
 
 	extra := ""
 
-	if creds.Unconfigured == true {
+	if creds.Unconfigured {
 		h.Log.Debug("Setting up connection config for unconfigured installer...")
 		extra += fmt.Sprintf("\nexport DT_TENANT=${DT_TENANT:-%s}", creds.EnvironmentID)
 		extra += fmt.Sprintf("\nexport DT_TENANTTOKEN=${DT_TENANTTOKEN:-%s}", creds.TenantToken)

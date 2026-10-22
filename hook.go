@@ -81,12 +81,8 @@ func (h *Hook) injectDynatrace(stager *libbuildpack.Stager, operatingSystem stri
 
 	h.Log.Debug("Checking for enabled dynatrace service...")
 
-	// Get credentials...
 	creds := h.getCredentials()
 	if creds == nil {
-		// FIXME this message is confusingly displayed when eg. unconfigured is set to true
-		// but there are dynatrace credentials configured.
-		h.Log.Debug("Dynatrace service credentials not found!")
 		return nil
 	}
 
@@ -215,18 +211,29 @@ func (h *Hook) getCredentials() *credentials {
 				return ""
 			}
 
+			queryBool := func(key string) bool {
+				switch value := service.Credentials[key].(type) {
+				case bool:
+					return value
+				case string:
+					return value == "true"
+				default:
+					return false
+				}
+			}
+
 			creds := &credentials{
 				ServiceName:       service.Name,
 				EnvironmentID:     queryString("environmentid"),
 				APIToken:          queryString("apitoken"),
 				APIURL:            queryString("apiurl"),
 				CustomOneAgentURL: queryString("customoneagenturl"),
-				SkipErrors:        queryString("skiperrors") == "true",
+				SkipErrors:        queryBool("skiperrors"),
 				NetworkZone:       queryString("networkzone"),
 				EnableFIPS:        queryString("enablefips") == "true",
 				AddTechnologies:   queryString("addtechnologies"),
 				RemoveTechnologies:   queryString("removetechnologies"),
-				Unconfigured:   queryString("unconfigured") == "true",
+				Unconfigured:   queryBool("unconfigured"),
 				TenantToken: queryString("tenanttoken"),
 				DTConnectionPoint: queryString("dtconnectionpoint"),
 			}
@@ -238,18 +245,22 @@ func (h *Hook) getCredentials() *credentials {
 					creds.EnvironmentID, creds.APIToken)
 			}
 
-			if creds.Unconfigured == true {
+			if creds.Unconfigured {
 				// FIXME make this a proper message
 				h.Log.Debug("Unconfigured agent installer flag detected")
-				// FIXME check all properties at once and give a combined error message if required
+				var unconfiguredNotFound string
 				if creds.CustomOneAgentURL == "" {
-					h.Log.Debug("Property customoneagenturl can not be empty when unconfigured is set to true")
-					return nil
-				} else if creds.TenantToken == "" {
-					h.Log.Debug("Property tenanttoken can not be empty when unconfigured is set to true")
-					return nil
-				} else if creds.DTConnectionPoint == "" {
-					h.Log.Debug("Property dtconnectionpoint can not be empty when unconfigured is set to true")
+					unconfiguredNotFound += "customoneagenturl "
+				}
+				if creds.TenantToken == "" {
+					unconfiguredNotFound += "tenanttoken "
+				}
+				if creds.DTConnectionPoint == "" {
+					unconfiguredNotFound += "dtconnectionpoint "
+				}
+
+				if unconfiguredNotFound != "" {
+					h.Log.Error("Following properties can not be empty when unconfigured is set to true: %s", unconfiguredNotFound)
 					return nil
 				}
 			}
@@ -263,8 +274,10 @@ func (h *Hook) getCredentials() *credentials {
 
 	if len(found) > 1 {
 		h.Log.Error("More than one matching service found!")
+		return nil
 	}
 
+	h.Log.Debug("Dynatrace service credentials not found!")
 	return nil
 }
 
@@ -497,7 +510,6 @@ func (h *Hook) updateAgentConfig(creds *credentials, installDir string, stager *
 		ver = "unknown"
 	}
 
-	// FIXME what do we do with this in the unconfigured case?
 	h.Log.Debug("Downloading updated OneAgent config from %s", agentConfigUrl)
 	req, _ := http.NewRequest("GET", agentConfigUrl, nil)
 	req.Header.Set("User-Agent", fmt.Sprintf("cf-%s-buildpack/%s", lang, ver))
