@@ -42,8 +42,8 @@ We support the following configuration fields,
 | removetechnologies| string | Removes OneAgent code-modules via a comma-separated list. This is applied **before** addtechnologies. | No | empty |
 | addtechnologies| string | Adds additional OneAgent code-modules via a comma-separated list. See [supported values](https://docs.dynatrace.com/docs/dynatrace-api/environment-api/deployment/oneagent/download-oneagent-version#parameters) in the "included" row | No | empty |
 | unconfigured | boolean | Must be set to true if an installer without the connection metadata is being used via customoneagenturl | No | false |
-| tenanttoken | string | [Dynatrace Tenant token](https://docs.dynatrace.com/docs/manage/identity-access-management-classic/access-tokens-and-oauth-clients/access-tokens/rotate-tenant-token) | when unconfigured is set to true |
-|dtconnectionpoint | string | [Connection endpoints](https://docs.dynatrace.com/docs/dynatrace-api/environment-api/deployment/oneagent/get-connectivity-info) | when unconfigured is set to true |
+| tenanttoken | string | [Dynatrace Tenant token](https://docs.dynatrace.com/docs/manage/identity-access-management-classic/access-tokens-and-oauth-clients/access-tokens/rotate-tenant-token) | when unconfigured is set to true | empty |
+|dtconnectionpoint | string | [Connection endpoints](https://docs.dynatrace.com/docs/dynatrace-api/environment-api/deployment/oneagent/get-connectivity-info) | when unconfigured is set to true | empty |
 
 For example,
 
