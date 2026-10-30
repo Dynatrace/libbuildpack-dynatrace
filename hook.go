@@ -246,7 +246,6 @@ func (h *Hook) getCredentials() *credentials {
 			}
 
 			if creds.Unconfigured {
-				// FIXME make this a proper message
 				h.Log.Debug("Unconfigured agent installer flag detected")
 				var unconfiguredNotFound string
 				if creds.CustomOneAgentURL == "" {
