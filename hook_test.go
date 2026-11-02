@@ -1062,6 +1062,39 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 		})
 
+		Context("VCAP_SERVICES_FILE_PATH points to valid file with dynatrace service and skiperrors set to true", func() {
+			var vcapFile string
+
+			BeforeEach(func() {
+				os.Setenv("BP_DEBUG", "true")
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Unsetenv("VCAP_SERVICES")
+
+				vcapContent := `{
+					"0": [{"name":"mysql"}],
+					"1": [{"name":"dynatrace","credentials":{"apiurl":"https://example.com","apitoken":"` + apiToken + `","environmentid":"` + environmentID + `","skiperrors":"true"}}],
+					"2": [{"name":"redis"}]
+				}`
+
+				vcapFile = filepath.Join(buildDir, "vcap_services.json")
+				err = os.WriteFile(vcapFile, []byte(vcapContent), 0644)
+				Expect(err).To(BeNil())
+
+				os.Setenv("VCAP_SERVICES_FILE_PATH", vcapFile)
+
+				httpmock.RegisterResponder("GET", "https://"+environmentID+".live.dynatrace.com/api/v1/deployment/installer/agent/"+OSName+"/"+InstallationMethod+"/latest?bitness=64&include=nginx&include=process&include=dotnet",
+					httpmock.NewStringResponder(404, "echo agent not found"))
+
+			})
+
+			It("does nothing and succeeds", func() {
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(BeNil())
+
+				Expect(buffer.String()).To(ContainSubstring("Error during installer download, skipping installation"))
+			})
+		})
+
 		Context("VCAP_SERVICES_FILE_PATH is set to empty string", func() {
 			BeforeEach(func() {
 				os.Setenv("BP_DEBUG", "true")
