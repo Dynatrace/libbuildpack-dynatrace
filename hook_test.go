@@ -513,6 +513,47 @@ export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 Cl
 			})
 		})
 
+		Context("VCAP_SERVICES contains dynatrace service with unconfigured set to false but tenanttoken and dtconnectionpoint configured", func() {
+			BeforeEach(func() {
+				os.Setenv("BP_DEBUG", "true")
+				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
+				os.Setenv("VCAP_SERVICES", `{
+					"0": [{"name":"dynatrace","credentials":{"environmentid":"`+environmentID+`","customoneagenturl":"https://custom.example.com/oneagent","unconfigured":false,"tenanttoken":"SecretTenantToken","dtconnectionpoint":"https://cp.example.com:443"}}]
+				}`)
+
+				httpmock.RegisterResponder("GET", "https://custom.example.com/oneagent", func(r *http.Request) (*http.Response, error) {
+					return getMockResponse(), nil
+				})
+
+				httpmock.RegisterResponder("GET", "https://example.com/v1/deployment/installer/agent/processmoduleconfig",
+					api_header_check)
+			})
+
+			It("installs dynatrace without writing the connection config into the env file", func() {
+				if *testOS != "windows" {
+					mockCommand.EXPECT().Execute("", gomock.Any(), gomock.Any(), gomock.Any(), buildDir).Do(simulateUnixInstaller)
+				}
+
+				err = hook.injectDynatrace(stager, *testOS)
+				Expect(err).To(BeNil())
+
+				Expect(buffer.String()).ToNot(ContainSubstring("Unconfigured agent installer flag detected"))
+
+				if *testOS != "windows" {
+					contents, err := os.ReadFile(filepath.Join(depsDir, depsIdx, "profile.d", ScriptFilename))
+					Expect(err).To(BeNil())
+
+					Expect(string(contents)).ToNot(ContainSubstring("DT_TENANT"))
+					Expect(string(contents)).ToNot(ContainSubstring("DT_TENANTTOKEN"))
+					Expect(string(contents)).ToNot(ContainSubstring("DT_CONNECTION_POINT"))
+					Expect(string(contents)).To(Equal(`echo running dynatrace-env.sh
+export LD_PRELOAD=${HOME}/dynatrace/oneagent/agent/lib64/liboneagentproc.so
+export DT_LOGSTREAM=stdout
+export DT_CUSTOM_PROP="${DT_CUSTOM_PROP} CloudFoundryBuildpackLanguage=test42 CloudFoundryBuildpackVersion=1.2.3"`))
+				}
+			})
+		})
+
 		Context("VCAP_SERVICES contains dynatrace service with unconfigured set to true but missing properties", func() {
 			BeforeEach(func() {
 				os.Setenv("VCAP_APPLICATION", `{"name":"JimBob"}`)
