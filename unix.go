@@ -55,8 +55,18 @@ func (h *Hook) runInstallerUnix(installerFilePath, installDir string, creds *cre
 		return err
 	}
 
+	var f *os.File
+	var file_flags int
+	if creds.Unconfigured == true {
+		// When the unconfigured parameter is true, we write the whole file ourselves,
+		// therefore truncating it is the easiest way to get around parsing and replacing
+		// existing content.
+		file_flags = os.O_TRUNC|os.O_WRONLY
+	} else {
+		file_flags = os.O_APPEND|os.O_WRONLY
+	}
 	h.Log.Debug("Open %s for modification...", dynatraceEnvPath)
-	f, err := os.OpenFile(dynatraceEnvPath, os.O_APPEND|os.O_WRONLY, os.ModeAppend)
+	f, err = os.OpenFile(dynatraceEnvPath, file_flags, os.ModeAppend)
 	if err != nil {
 		return err
 	}
@@ -64,6 +74,13 @@ func (h *Hook) runInstallerUnix(installerFilePath, installDir string, creds *cre
 	defer f.Close()
 
 	extra := ""
+
+	if creds.Unconfigured {
+		h.Log.Debug("Setting up connection config for unconfigured installer...")
+		extra += fmt.Sprintf("\nexport DT_TENANT=${DT_TENANT:-%s}", creds.EnvironmentID)
+		extra += fmt.Sprintf("\nexport DT_TENANTTOKEN=${DT_TENANTTOKEN:-%s}", creds.TenantToken)
+		extra += fmt.Sprintf("\nexport DT_CONNECTION_POINT=${DT_CONNECTION_POINT:-\"%s\"}", creds.DTConnectionPoint)
+	}
 
 	h.Log.Debug("Setting LD_PRELOAD...")
 	extra += fmt.Sprintf("\nexport LD_PRELOAD=${HOME}/%s", agentLibPath)

@@ -38,6 +38,9 @@ type credentials struct {
 	EnableFIPS        bool
 	AddTechnologies   string
 	RemoveTechnologies string
+	Unconfigured     bool
+	TenantToken string
+	DTConnectionPoint string
 }
 
 // Hook implements libbuildpack.Hook. It downloads and install the Dynatrace OneAgent.
@@ -78,10 +81,8 @@ func (h *Hook) injectDynatrace(stager *libbuildpack.Stager, operatingSystem stri
 
 	h.Log.Debug("Checking for enabled dynatrace service...")
 
-	// Get credentials...
 	creds := h.getCredentials()
 	if creds == nil {
-		h.Log.Debug("Dynatrace service credentials not found!")
 		return nil
 	}
 
@@ -210,17 +211,31 @@ func (h *Hook) getCredentials() *credentials {
 				return ""
 			}
 
+			queryBool := func(key string) bool {
+				switch value := service.Credentials[key].(type) {
+				case bool:
+					return value
+				case string:
+					return value == "true"
+				default:
+					return false
+				}
+			}
+
 			creds := &credentials{
 				ServiceName:       service.Name,
 				EnvironmentID:     queryString("environmentid"),
 				APIToken:          queryString("apitoken"),
 				APIURL:            queryString("apiurl"),
 				CustomOneAgentURL: queryString("customoneagenturl"),
-				SkipErrors:        queryString("skiperrors") == "true",
+				SkipErrors:        queryBool("skiperrors"),
 				NetworkZone:       queryString("networkzone"),
-				EnableFIPS:        queryString("enablefips") == "true",
+				EnableFIPS:        queryBool("enablefips"),
 				AddTechnologies:   queryString("addtechnologies"),
 				RemoveTechnologies:   queryString("removetechnologies"),
+				Unconfigured:   queryBool("unconfigured"),
+				TenantToken: queryString("tenanttoken"),
+				DTConnectionPoint: queryString("dtconnectionpoint"),
 			}
 
 			if (creds.EnvironmentID != "" && creds.APIToken != "") || creds.CustomOneAgentURL != "" {
@@ -228,6 +243,25 @@ func (h *Hook) getCredentials() *credentials {
 			} else if !(creds.EnvironmentID == "" && creds.APIToken == "") { // One of the fields is empty.
 				h.Log.Error("Incomplete credentials for service: %s, environment ID: %s, API token: %s", creds.ServiceName,
 					creds.EnvironmentID, creds.APIToken)
+			}
+
+			if creds.Unconfigured {
+				h.Log.Debug("Unconfigured agent installer flag detected")
+				var unconfiguredNotFound string
+				if creds.CustomOneAgentURL == "" {
+					unconfiguredNotFound += "customoneagenturl "
+				}
+				if creds.TenantToken == "" {
+					unconfiguredNotFound += "tenanttoken "
+				}
+				if creds.DTConnectionPoint == "" {
+					unconfiguredNotFound += "dtconnectionpoint "
+				}
+
+				if unconfiguredNotFound != "" {
+					h.Log.Error("Following properties can not be empty when unconfigured is set to true: %s", unconfiguredNotFound)
+					return nil
+				}
 			}
 		}
 	}
@@ -239,8 +273,10 @@ func (h *Hook) getCredentials() *credentials {
 
 	if len(found) > 1 {
 		h.Log.Error("More than one matching service found!")
+		return nil
 	}
 
+	h.Log.Debug("Dynatrace service credentials not found!")
 	return nil
 }
 
