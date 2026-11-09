@@ -230,7 +230,7 @@ func (h *Hook) getCredentials() *credentials {
 				CustomOneAgentURL: queryString("customoneagenturl"),
 				SkipErrors:        queryBool("skiperrors"),
 				NetworkZone:       queryString("networkzone"),
-				EnableFIPS:        queryString("enablefips") == "true",
+				EnableFIPS:        queryBool("enablefips"),
 				AddTechnologies:   queryString("addtechnologies"),
 				RemoveTechnologies:   queryString("removetechnologies"),
 				Unconfigured:   queryBool("unconfigured"),
